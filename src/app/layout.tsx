@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Geist, Geist_Mono } from "next/font/google";
+import { UserNav } from "@/components/user-nav";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -31,7 +32,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               <Link href="/" className="hover:opacity-70">
                 首页
               </Link>
-              <span className="opacity-40">购物车（开发中）</span>
+              <UserNav />
             </nav>
           </div>
         </header>

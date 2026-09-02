@@ -15,3 +15,8 @@ export interface ApiFailure {
 }
 
 export type ApiResponse<T = unknown> = ApiSuccess<T> | ApiFailure;
+
+/** 类型守卫：收窄到成功分支，之后 result.data 的类型是 T */
+export function isApiSuccess<T>(response: ApiResponse<T>): response is ApiSuccess<T> {
+  return response.code === 0;
+}

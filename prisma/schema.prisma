@@ -10,6 +10,35 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ==================== 用户 ====================
+
+model User {
+  id           Int        @id @default(autoincrement())
+  email        String     @unique @db.VarChar(200)
+  passwordHash String     @map("password_hash") @db.VarChar(100)
+  nickname     String     @db.VarChar(50)
+  createdAt    DateTime   @default(now()) @map("created_at")
+  cartItems    CartItem[]
+
+  @@map("users")
+}
+
+// ==================== 购物车 ====================
+
+model CartItem {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId Int      @map("product_id")
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  quantity  Int      @default(1)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([userId, productId])
+  @@map("cart_items")
+}
+
 // ==================== 分类 ====================
 
 model Category {
@@ -46,6 +75,7 @@ model Product {
   category    Category?     @relation(fields: [categoryId], references: [id])
   createdAt   DateTime      @default(now()) @map("created_at")
   updatedAt   DateTime      @updatedAt @map("updated_at")
+  cartItems   CartItem[]
 
   @@index([categoryId])
   @@index([status])

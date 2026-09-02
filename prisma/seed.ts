@@ -2,6 +2,7 @@
 // 运行：npm run db:seed（需先完成 db:migrate）
 
 import { PrismaClient, ProductStatus } from "@prisma/client";
+import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
@@ -123,6 +124,17 @@ const products: SeedProduct[] = [
 ];
 
 async function main() {
+  // 演示账号：demo@example.com / demo123456（幂等，密码变更不覆盖）
+  await prisma.user.upsert({
+    where: { email: "demo@example.com" },
+    update: {},
+    create: {
+      email: "demo@example.com",
+      nickname: "演示用户",
+      passwordHash: await bcrypt.hash("demo123456", 10),
+    },
+  });
+
   // 分类按 slug 幂等写入
   const categoryMap = new Map<string, number>();
   for (const category of categories) {

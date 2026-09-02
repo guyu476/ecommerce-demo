@@ -81,7 +81,7 @@ export default async function ProductDetailPage({ params }: Props) {
           )}
 
           <div className="mt-auto pt-2">
-            <AddToCartButton disabled={product.stock <= 0} />
+            <AddToCartButton productId={product.id} disabled={product.stock <= 0} />
           </div>
         </div>
       </div>
