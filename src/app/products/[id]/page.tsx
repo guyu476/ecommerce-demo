@@ -56,24 +56,40 @@ export default async function ProductDetailPage({ params }: Props) {
         <span>商品详情</span>
       </nav>
 
-      <div className="grid gap-12 sm:grid-cols-2">
-        <div className="flex aspect-square items-center justify-center rounded-2xl bg-mist text-[120px] ">
-          {product.category?.icon ?? "🛍️"}
+      <div className="grid gap-14 sm:grid-cols-2">
+        {/* 拍立得相框 + 纸胶带（画报感） */}
+        <div className="relative -rotate-1 self-start rounded-lg bg-white p-3 shadow-xl dark:bg-white/10">
+          <span
+            aria-hidden
+            className="washi absolute -top-3 left-1/2 h-7 w-28 -translate-x-1/2 rotate-2 rounded-sm"
+          />
+          <div className="flex aspect-square items-center justify-center rounded-md bg-mist text-[130px] dark:bg-white/5">
+            {product.category?.icon ?? "🛍️"}
+          </div>
+          <p className="pt-2.5 pb-1 text-center font-mono text-xs opacity-50">
+            NO.{String(product.id).padStart(4, "0")}
+          </p>
         </div>
 
-        <div className="flex flex-col gap-4">
-          <h1 className="text-xl font-bold leading-7">{product.name}</h1>
+        <div className="flex flex-col gap-5">
+          <h1 className="text-2xl font-extrabold leading-8 tracking-tight">{product.name}</h1>
 
-          <p className="font-mono text-4xl font-bold text-promo">{formatPrice(product.price)}</p>
+          {/* 海报式价格：小眉毛 + 大字 */}
+          <div>
+            <p className="text-xs tracking-[0.3em] text-promo">到手价</p>
+            <p className="font-mono text-4xl font-black text-promo">{formatPrice(product.price)}</p>
+          </div>
 
-          <ul className="flex gap-4 text-sm opacity-60">
+          <ul className="flex gap-5 text-sm opacity-60">
             <li>已售 {formatSales(product.sales)} 件</li>
             <li>库存 {product.stock} 件</li>
             <li>{product.stock > 0 ? "现货" : "暂时缺货"}</li>
           </ul>
 
           {product.description && (
-            <p className="text-sm leading-6 opacity-80">{product.description}</p>
+            <p className="border-l-2 border-market/60 pl-4 text-sm leading-7 opacity-80">
+              {product.description}
+            </p>
           )}
 
           <div className="mt-auto pt-2">

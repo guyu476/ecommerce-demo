@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-/* 设计 token：「市集价签」方向
+/* 设计 token：「市集画报」方向
    墨蓝 #14213D 结构色 · 促销红 #E63946 价格/CTA · 市集黄 #FCA311 强调 */
 :root {
   --background: #ffffff;
@@ -37,9 +37,73 @@ body {
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
 }
 
+/* 点阵纸纹（浅色模式），给白底一点纸的质感 */
+@media (prefers-color-scheme: light) {
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-image: radial-gradient(rgba(20, 33, 61, 0.05) 1px, transparent 1px);
+    background-size: 26px 26px;
+  }
+}
+
+/* 印章：中式方章，白字红底，微旋转（用作 Logo/徽标/标签） */
+.seal {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-promo);
+  color: #fff;
+  font-weight: 900;
+  transform: rotate(-6deg);
+  box-shadow: 0 2px 6px rgba(20, 33, 61, 0.25);
+}
+
+/* 纸胶带：贴在卡片顶角的半透明胶带 */
+.washi {
+  position: absolute;
+  background: color-mix(in srgb, var(--color-market) 65%, transparent);
+  backdrop-filter: blur(1px);
+  box-shadow: 0 1px 3px rgba(20, 33, 61, 0.12);
+}
+
+/* 跑马灯：促销横幅循环滚动 */
+@keyframes marquee {
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.marquee-track {
+  animation: marquee 22s linear infinite;
+}
+
+/* 巨型描边水印字（板块背景装饰） */
+.text-outline {
+  color: transparent;
+  -webkit-text-stroke: 1.5px rgba(20, 33, 61, 0.08);
+}
+
+@media (prefers-color-scheme: dark) {
+  .text-outline {
+    -webkit-text-stroke-color: rgba(237, 237, 242, 0.07);
+  }
+}
+
+/* 优惠券虚线分隔 */
+.coupon-dash {
+  border-top: 2px dashed rgba(20, 33, 61, 0.12);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .hover-lift {
     transition: none !important;
     transform: none !important;
+  }
+  .marquee-track {
+    animation: none !important;
   }
 }
