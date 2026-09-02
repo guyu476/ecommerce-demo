@@ -48,7 +48,7 @@ export function HeroCarousel({ slides }: { slides: CarouselSlide[] }) {
   return (
     <section
       aria-label="今日爆款轮播"
-      className="relative select-none"
+      className="relative isolate select-none"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >

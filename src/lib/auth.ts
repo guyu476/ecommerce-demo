@@ -19,6 +19,7 @@ export interface SessionUser {
   id: number;
   email: string;
   nickname: string;
+  avatar: string | null;
 }
 
 export async function createSessionToken(userId: number): Promise<string> {
@@ -42,7 +43,7 @@ export async function getSessionUser(): Promise<SessionUser | null> {
 
     return await prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, email: true, nickname: true },
+      select: { id: true, email: true, nickname: true, avatar: true },
     });
   } catch {
     return null;

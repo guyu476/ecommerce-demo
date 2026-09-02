@@ -15,8 +15,6 @@ export function ProductCard({
   rank?: number;
   tilt?: number;
 }) {
-  const tight = product.stock > 0 && product.stock <= 50;
-
   return (
     <Link
       href={`/products/${product.id}`}
@@ -33,12 +31,6 @@ export function ProductCard({
         {rank != null && rank <= 3 && (
           <span className="absolute top-0 right-0 rounded-bl-xl bg-ink px-2.5 py-1 font-mono text-[11px] font-bold text-market">
             TOP {rank}
-          </span>
-        )}
-
-        {tight && (
-          <span className="seal absolute bottom-2 left-2 rotate-[-8deg] rounded-md px-1.5 py-0.5 text-[10px]">
-            仅剩{product.stock}件
           </span>
         )}
       </div>

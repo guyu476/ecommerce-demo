@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ecommerce-demo · 电商网站 Demo",
+  title: "淘东商城 · Next.js 电商 Demo",
   description: "基于 Next.js 全栈的电商网站演示项目",
 };
 
@@ -45,11 +45,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           </div>
         </div>
 
-        <header className="sticky top-0 z-10 bg-ink text-white">
+        {/* 非悬浮头部：滚动时不遮挡页面内容 */}
+        <header className="bg-ink text-white">
           <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-6">
             <Link href="/" className="flex items-center gap-3">
-              <span className="seal h-10 w-10 rounded-lg text-2xl">市</span>
-              <span className="text-xl font-bold tracking-tight">ecommerce-demo 商城</span>
+              <span className="seal h-10 w-10 rounded-lg text-2xl">淘</span>
+              <span className="text-xl font-bold tracking-tight">淘东商城</span>
             </Link>
             <nav className="flex gap-6 text-sm">
               <Link href="/" className="hover:opacity-70">
@@ -63,7 +64,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         {children}
 
         <footer className="bg-mist py-10 text-center text-xs opacity-60 dark:bg-white/5">
-          ecommerce-demo · Next.js 全栈演示项目
+          淘东商城 · Next.js 全栈演示项目
         </footer>
       </body>
     </html>

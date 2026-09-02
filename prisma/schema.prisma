@@ -17,6 +17,7 @@ model User {
   email        String     @unique @db.VarChar(200)
   passwordHash String     @map("password_hash") @db.VarChar(100)
   nickname     String     @db.VarChar(50)
+  avatar       String?    @db.VarChar(16)
   createdAt    DateTime   @default(now()) @map("created_at")
   cartItems    CartItem[]
   orders       Order[]

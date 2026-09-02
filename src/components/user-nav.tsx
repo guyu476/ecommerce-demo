@@ -6,9 +6,14 @@ import { useCallback, useEffect, useState } from "react";
 import type { ApiResponse } from "@/types/api";
 import { isApiSuccess } from "@/types/api";
 
-type Me = { id: number; email: string; nickname: string } | null;
+type Me = {
+  id: number;
+  email: string;
+  nickname: string;
+  avatar: string | null;
+} | null;
 
-// 头部用户区：登录状态 + 购物车入口（角标数量）
+// 头部用户区：「我的淘东」入口（含头像与购物车角标）
 // 其他组件加购成功后 dispatch window 事件 "cart-changed" 即可触发角标刷新
 export function UserNav() {
   const router = useRouter();
@@ -47,6 +52,7 @@ export function UserNav() {
     await fetch("/api/auth/logout", { method: "POST" });
     setMe(null);
     setCartCount(0);
+    router.push("/");
     router.refresh();
   }
 
@@ -55,7 +61,7 @@ export function UserNav() {
   }
 
   return (
-    <div className="flex items-center gap-5 text-sm">
+    <div className="flex items-center gap-6 text-sm">
       <Link href="/cart" className="hover:opacity-70">
         🛒 购物车
         {cartCount > 0 && (
@@ -66,10 +72,12 @@ export function UserNav() {
       </Link>
       {me ? (
         <>
-          <Link href="/orders" className="hover:opacity-70">
-            我的订单
+          <Link href="/user" className="flex items-center gap-2 hover:opacity-70">
+            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/15 text-base">
+              {me.avatar ?? "🙂"}
+            </span>
+            我的淘东
           </Link>
-          <span className="opacity-70">你好，{me.nickname}</span>
           <button type="button" onClick={logout} className="opacity-60 hover:opacity-100">
             退出
           </button>
