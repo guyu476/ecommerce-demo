@@ -66,6 +66,9 @@ export function UserNav() {
       </Link>
       {me ? (
         <>
+          <Link href="/orders" className="hover:opacity-70">
+            我的订单
+          </Link>
           <span className="opacity-70">你好，{me.nickname}</span>
           <button type="button" onClick={logout} className="opacity-60 hover:opacity-100">
             退出

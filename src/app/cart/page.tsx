@@ -190,10 +190,10 @@ export default function CartPage() {
             </p>
             <button
               type="button"
-              onClick={() => router.push("/")}
+              onClick={() => router.push("/checkout")}
               className="rounded-full bg-promo px-8 py-2.5 text-sm font-medium text-white hover:bg-promo-deep"
             >
-              去结算（开发中）
+              去结算
             </button>
           </div>
         </>

@@ -19,6 +19,7 @@ model User {
   nickname     String     @db.VarChar(50)
   createdAt    DateTime   @default(now()) @map("created_at")
   cartItems    CartItem[]
+  orders       Order[]
 
   @@map("users")
 }
@@ -76,8 +77,70 @@ model Product {
   createdAt   DateTime      @default(now()) @map("created_at")
   updatedAt   DateTime      @updatedAt @map("updated_at")
   cartItems   CartItem[]
+  orderItems  OrderItem[]
 
   @@index([categoryId])
   @@index([status])
   @@map("products")
+}
+
+// ==================== 订单 ====================
+
+enum OrderStatus {
+  PENDING_PAYMENT
+  PAID
+  SHIPPED
+  COMPLETED
+  CANCELLED
+
+  @@map("order_status")
+}
+
+model Order {
+  id              Int         @id @default(autoincrement())
+  orderNo         String      @unique @map("order_no") @db.VarChar(32)
+  userId          Int         @map("user_id")
+  user            User        @relation(fields: [userId], references: [id])
+  status          OrderStatus @default(PENDING_PAYMENT)
+  totalAmount     Decimal     @map("total_amount") @db.Decimal(10, 2)
+  recipientName   String      @map("recipient_name") @db.VarChar(50)
+  recipientPhone  String      @map("recipient_phone") @db.VarChar(20)
+  shippingAddress String      @map("shipping_address") @db.VarChar(500)
+  items           OrderItem[]
+  idempotencyKeys IdempotencyKey[]
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@map("orders")
+}
+
+// 订单条目：商品名与单价为下单时快照，不受后续改价影响
+model OrderItem {
+  id        Int      @id @default(autoincrement())
+  orderId   Int      @map("order_id")
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId Int      @map("product_id")
+  product   Product  @relation(fields: [productId], references: [id])
+  name      String   @map("product_name") @db.VarChar(200)
+  price     Decimal  @map("unit_price") @db.Decimal(10, 2)
+  quantity  Int
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([orderId])
+  @@map("order_items")
+}
+
+// 幂等键：下单防重。唯一约束是幂等的实现机制（原子抢占），不是先查后插
+model IdempotencyKey {
+  id          Int      @id @default(autoincrement())
+  key         String   @unique @db.VarChar(80)
+  userId      Int      @map("user_id")
+  requestHash String   @map("request_hash") @db.VarChar(64)
+  orderId     Int?     @map("order_id")
+  order       Order?   @relation(fields: [orderId], references: [id])
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@map("idempotency_keys")
 }

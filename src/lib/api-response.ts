@@ -65,7 +65,8 @@ export async function handleRoute(handler: () => Promise<NextResponse>): Promise
   }
 }
 
-function isPrismaError(error: unknown, code: string): boolean {
+/** 判断是否为指定代码的 Prisma 已知错误（如 P2002 唯一约束冲突、P2025 记录不存在） */
+export function isPrismaError(error: unknown, code: string): boolean {
   return (
     typeof error === "object" &&
     error !== null &&
