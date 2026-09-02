@@ -64,9 +64,7 @@ export default async function ProductDetailPage({ params }: Props) {
         <div className="flex flex-col gap-4">
           <h1 className="text-xl font-bold leading-7">{product.name}</h1>
 
-          <p>
-            <span className="price-tag px-5 py-1.5 text-3xl">{formatPrice(product.price)}</span>
-          </p>
+          <p className="font-mono text-3xl font-bold text-promo">{formatPrice(product.price)}</p>
 
           <ul className="flex gap-4 text-sm opacity-60">
             <li>已售 {formatSales(product.sales)} 件</li>

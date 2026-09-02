@@ -7,9 +7,10 @@ export type CategoryWithCount = Category & { productCount: number };
 
 /**
  * 首页数据：在售分类 + 热卖商品。
+ * 传入 categorySlug 时按分类过滤商品（分类可点击筛选）。
  * 数据库未就绪（未执行 migrate）时返回 null，由页面渲染引导提示而不是报错。
  */
-export async function getStorefrontData(): Promise<{
+export async function getStorefrontData(categorySlug?: string): Promise<{
   categories: CategoryWithCount[];
   products: ProductWithCategory[];
 } | null> {
@@ -22,7 +23,10 @@ export async function getStorefrontData(): Promise<{
         },
       }),
       prisma.product.findMany({
-        where: { status: "ON_SALE" },
+        where: {
+          status: "ON_SALE",
+          ...(categorySlug ? { category: { slug: categorySlug } } : {}),
+        },
         include: { category: true },
         orderBy: [{ sales: "desc" }, { createdAt: "desc" }],
         take: 12,
