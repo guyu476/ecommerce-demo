@@ -83,7 +83,7 @@ export default function RegisterPage() {
         <button
           type="submit"
           disabled={submitting}
-          className="w-full rounded-full bg-orange-600 py-2.5 font-medium text-white transition-colors hover:bg-orange-700 disabled:opacity-50"
+          className="w-full rounded-full bg-promo py-2.5 font-medium text-white transition-colors hover:bg-promo-deep disabled:opacity-50"
         >
           {submitting ? "注册中…" : "注册并登录"}
         </button>
@@ -91,7 +91,7 @@ export default function RegisterPage() {
 
       <p className="mt-4 text-center text-sm opacity-70">
         已有账号？{" "}
-        <Link href="/login" className="text-orange-600 hover:underline">
+        <Link href="/login" className="text-promo hover:underline">
           去登录
         </Link>
       </p>

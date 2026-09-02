@@ -91,7 +91,7 @@ export default function CartPage() {
         <p className="text-sm opacity-70">登录后才能查看购物车</p>
         <Link
           href="/login?redirect=/cart"
-          className="rounded-full bg-orange-600 px-8 py-2.5 text-sm font-medium text-white hover:bg-orange-700"
+          className="rounded-full bg-promo px-8 py-2.5 text-sm font-medium text-white hover:bg-promo-deep"
         >
           去登录
         </Link>
@@ -117,7 +117,7 @@ export default function CartPage() {
           <p className="mb-4 text-sm opacity-60">购物车还是空的</p>
           <Link
             href="/"
-            className="inline-block rounded-full bg-orange-600 px-8 py-2.5 text-sm font-medium text-white hover:bg-orange-700"
+            className="inline-block rounded-full bg-promo px-8 py-2.5 text-sm font-medium text-white hover:bg-promo-deep"
           >
             去逛逛
           </Link>
@@ -127,7 +127,7 @@ export default function CartPage() {
           <ul className="divide-y divide-black/10 rounded-xl border border-black/10 dark:divide-white/10 dark:border-white/15">
             {items.map((item) => (
               <li key={item.id} className="flex items-center gap-4 p-4">
-                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-orange-50 to-amber-100 text-3xl dark:from-zinc-800 dark:to-zinc-800/40">
+                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg bg-mist text-3xl ">
                   {item.product.category?.icon ?? "🛍️"}
                 </div>
 
@@ -173,7 +173,7 @@ export default function CartPage() {
                   type="button"
                   disabled={busyId === item.id}
                   onClick={() => removeItem(item.id)}
-                  className="text-xs opacity-50 hover:text-red-500 hover:opacity-100"
+                  className="text-xs opacity-50 hover:text-promo hover:opacity-100"
                 >
                   删除
                 </button>
@@ -191,7 +191,7 @@ export default function CartPage() {
             <button
               type="button"
               onClick={() => router.push("/")}
-              className="rounded-full bg-orange-600 px-8 py-2.5 text-sm font-medium text-white hover:bg-orange-700"
+              className="rounded-full bg-promo px-8 py-2.5 text-sm font-medium text-white hover:bg-promo-deep"
             >
               去结算（开发中）
             </button>

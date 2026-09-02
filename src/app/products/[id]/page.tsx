@@ -57,17 +57,15 @@ export default async function ProductDetailPage({ params }: Props) {
       </nav>
 
       <div className="grid gap-8 sm:grid-cols-2">
-        <div className="flex aspect-square items-center justify-center rounded-2xl bg-gradient-to-br from-orange-50 to-amber-100 text-[120px] dark:from-zinc-800 dark:to-zinc-800/40">
+        <div className="flex aspect-square items-center justify-center rounded-2xl bg-mist text-[120px] ">
           {product.category?.icon ?? "🛍️"}
         </div>
 
         <div className="flex flex-col gap-4">
           <h1 className="text-xl font-bold leading-7">{product.name}</h1>
 
-          <p className="rounded-xl bg-red-50 px-4 py-3 dark:bg-red-500/10">
-            <span className="text-3xl font-bold text-red-600 dark:text-red-400">
-              {formatPrice(product.price)}
-            </span>
+          <p>
+            <span className="price-tag px-5 py-1.5 text-3xl">{formatPrice(product.price)}</span>
           </p>
 
           <ul className="flex gap-4 text-sm opacity-60">

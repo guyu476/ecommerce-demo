@@ -1,8 +1,10 @@
 @import "tailwindcss";
 
+/* 设计 token：「市集价签」方向
+   墨蓝 #14213D 结构色 · 促销红 #E63946 价格/CTA · 市集黄 #FCA311 强调 */
 :root {
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: #14213d;
 }
 
 @theme inline {
@@ -12,15 +14,58 @@
   --font-mono: var(--font-geist-mono);
 }
 
+@theme {
+  --color-ink: #14213d;
+  --color-ink-soft: #3a4763;
+  --color-paper: #ffffff;
+  --color-mist: #f3f5f8;
+  --color-promo: #e63946;
+  --color-promo-deep: #c22833;
+  --color-market: #fca311;
+}
+
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #0b1220;
+    --foreground: #ededf2;
   }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+/* 签名元素：促销价签（红底白字 + 打孔 + 微旋转，只在关键位置使用） */
+.price-tag {
+  position: relative;
+  display: inline-block;
+  background: var(--color-promo);
+  color: #fff;
+  font-family: var(--font-geist-mono), monospace;
+  font-weight: 700;
+  transform: rotate(-2deg);
+  box-shadow: 0 2px 0 rgba(20, 33, 61, 0.18);
+}
+
+.price-tag::before {
+  content: "";
+  position: absolute;
+  left: 6px;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  margin-top: -3.5px;
+  border-radius: 9999px;
+  background: var(--color-ink);
+  opacity: 0.55;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .price-tag,
+  .hover-lift {
+    transition: none !important;
+    transform: none !important;
+  }
 }

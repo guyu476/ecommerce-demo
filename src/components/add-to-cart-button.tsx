@@ -52,11 +52,11 @@ export function AddToCartButton({
         type="button"
         disabled={disabled || submitting}
         onClick={addToCart}
-        className="w-full rounded-full bg-orange-600 px-6 py-3 font-medium text-white transition-colors hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-40"
+        className="w-full rounded-full bg-promo px-6 py-3 font-medium text-white transition-colors hover:bg-promo-deep disabled:cursor-not-allowed disabled:opacity-40"
       >
         {submitting ? "加入中…" : "加入购物车"}
       </button>
-      {hint && <p className="text-center text-xs text-orange-600">{hint}</p>}
+      {hint && <p className="text-center text-xs text-promo">{hint}</p>}
     </div>
   );
 }

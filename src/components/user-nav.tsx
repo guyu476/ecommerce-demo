@@ -59,7 +59,7 @@ export function UserNav() {
       <Link href="/cart" className="hover:opacity-70">
         🛒 购物车
         {cartCount > 0 && (
-          <span className="ml-1 rounded-full bg-orange-600 px-1.5 py-0.5 text-xs text-white">
+          <span className="ml-1 rounded-full bg-promo px-1.5 py-0.5 text-xs text-white">
             {cartCount}
           </span>
         )}
