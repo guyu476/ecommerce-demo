@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { AddressManager } from "@/components/address-manager";
 import type { ApiResponse } from "@/types/api";
 import { isApiSuccess } from "@/types/api";
 
@@ -15,7 +16,16 @@ type Me = {
 
 const AVATAR_OPTIONS = ["🙂", "😎", "🥰", "🤠", "🐱", "🐼", "🦊", "🐸", "🌟", "🔥", "🍀", "🎉"];
 
-// 我的淘东：个人中心（改昵称/头像 + 订单入口）
+// 头像统一渲染：data URL 用 <img>，emoji 用文字
+function AvatarView({ avatar, sizeClass }: { avatar: string | null; sizeClass: string }) {
+  if (avatar?.startsWith("data:")) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={avatar} alt="头像" className={`${sizeClass} rounded-full object-cover`} />;
+  }
+  return <span className={`${sizeClass} flex items-center justify-center`}>{avatar ?? "🙂"}</span>;
+}
+
+// 我的鸟西：个人中心（改昵称/头像上传 + 地址簿 + 订单入口）
 export default function UserCenterPage() {
   const router = useRouter();
   const [status, setStatus] = useState<"loading" | "guest" | "ready">("loading");
@@ -25,6 +35,7 @@ export default function UserCenterPage() {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadMe = useCallback(async () => {
     const res = await fetch("/api/auth/me");
@@ -44,6 +55,43 @@ export default function UserCenterPage() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadMe();
   }, [loadMe]);
+
+  // 头像上传：客户端等比裁剪压缩到 192×192 JPEG（data URL），不占服务器存储
+  function handleAvatarFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setError("请选择图片文件");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError("图片不能超过 5MB");
+      return;
+    }
+    setError(null);
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const size = 192;
+        const canvas = document.createElement("canvas");
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+        const scale = Math.max(size / img.width, size / img.height);
+        const w = img.width * scale;
+        const h = img.height * scale;
+        ctx.drawImage(img, (size - w) / 2, (size - h) / 2, w, h);
+        setAvatar(canvas.toDataURL("image/jpeg", 0.85));
+        setSaved(false);
+      };
+      img.onerror = () => setError("图片读取失败");
+      img.src = String(reader.result);
+    };
+    reader.readAsDataURL(file);
+  }
 
   async function saveProfile(e: React.FormEvent) {
     e.preventDefault();
@@ -90,7 +138,7 @@ export default function UserCenterPage() {
     return (
       <main className="mx-auto flex w-full max-w-sm flex-1 flex-col items-center justify-center gap-4 px-6 py-24 text-center">
         <p className="text-4xl">🔒</p>
-        <p className="text-sm opacity-70">登录后才能进入我的淘东</p>
+        <p className="text-sm opacity-70">登录后才能进入我的鸟西</p>
         <Link
           href="/login?redirect=/user"
           className="rounded-full bg-promo px-8 py-2.5 text-sm font-medium text-white hover:bg-promo-deep"
@@ -105,14 +153,17 @@ export default function UserCenterPage() {
     "w-full rounded-lg border border-black/15 px-3 py-2 text-sm dark:border-white/20";
 
   return (
-    <main className="mx-auto w-full max-w-2xl flex-1 px-6 py-12">
-      <h1 className="mb-8 text-2xl font-extrabold tracking-tight">我的淘东</h1>
+    <main className="mx-auto w-full max-w-2xl flex-1 space-y-8 px-6 py-12">
+      <h1 className="text-2xl font-extrabold tracking-tight">我的鸟西</h1>
 
       {/* 个人信息卡 */}
-      <section className="mb-8 rounded-2xl border border-black/10 bg-white p-6 dark:border-white/15 dark:bg-white/5">
+      <section className="rounded-2xl border border-black/10 bg-white p-6 dark:border-white/15 dark:bg-white/5">
         <div className="mb-6 flex items-center gap-5">
-          <span className="seal flex h-20 w-20 rounded-full text-5xl" style={{ rotate: "0deg" }}>
-            {avatar}
+          <span
+            className="seal flex h-20 w-20 overflow-hidden rounded-full text-5xl"
+            style={{ rotate: "0deg" }}
+          >
+            <AvatarView avatar={avatar} sizeClass="h-full w-full" />
           </span>
           <div>
             <p className="text-lg font-bold">{me?.nickname}</p>
@@ -122,7 +173,7 @@ export default function UserCenterPage() {
 
         <form onSubmit={saveProfile} className="space-y-5">
           <div>
-            <p className="mb-2 text-sm opacity-70">选择头像</p>
+            <p className="mb-2 text-sm opacity-70">选择表情头像</p>
             <div className="flex flex-wrap gap-2.5">
               {AVATAR_OPTIONS.map((emoji) => (
                 <button
@@ -139,6 +190,22 @@ export default function UserCenterPage() {
                   {emoji}
                 </button>
               ))}
+            </div>
+            <div className="mt-3">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleAvatarFile}
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="rounded-full border border-dashed border-black/25 px-4 py-1.5 text-xs opacity-70 transition-colors hover:border-promo hover:text-promo hover:opacity-100 dark:border-white/25"
+              >
+                ⬆ 上传自定义头像（自动裁剪为圆形）
+              </button>
             </div>
           </div>
 
@@ -168,6 +235,9 @@ export default function UserCenterPage() {
         </form>
       </section>
 
+      {/* 地址簿 */}
+      <AddressManager />
+
       {/* 快捷入口 */}
       <section className="overflow-hidden rounded-2xl border border-black/10 dark:border-white/15">
         <h2 className="bg-mist px-6 py-3 text-sm font-semibold dark:bg-white/5">我的服务</h2>
@@ -181,22 +251,13 @@ export default function UserCenterPage() {
               <span className="opacity-40">›</span>
             </Link>
           </li>
-          <li>
-            <Link
-              href="/cart"
-              className="flex items-center justify-between px-6 py-4 text-sm transition-colors hover:bg-mist dark:hover:bg-white/5"
-            >
-              <span>🛒 购物车</span>
-              <span className="opacity-40">›</span>
-            </Link>
-          </li>
         </ul>
       </section>
 
       <button
         type="button"
         onClick={logout}
-        className="mt-8 w-full rounded-full border border-black/15 py-3 text-sm opacity-70 transition-colors hover:border-promo hover:text-promo hover:opacity-100 dark:border-white/20"
+        className="w-full rounded-full border border-black/15 py-3 text-sm opacity-70 transition-colors hover:border-promo hover:text-promo hover:opacity-100 dark:border-white/20"
       >
         退出登录
       </button>

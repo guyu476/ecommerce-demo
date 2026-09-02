@@ -37,6 +37,27 @@ export default function CheckoutPage() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  // 地址簿：登录后加载，默认地址自动填入收货信息
+  type AddressOption = {
+    id: number;
+    recipientName: string;
+    recipientPhone: string;
+    shippingAddress: string;
+    isDefault: boolean;
+  };
+  const [addresses, setAddresses] = useState<AddressOption[]>([]);
+  const [selectedAddressId, setSelectedAddressId] = useState<string>("");
+
+  function applyAddress(id: number) {
+    const address = addresses.find((a) => a.id === id);
+    if (!address) return;
+    setForm({
+      recipientName: address.recipientName,
+      recipientPhone: address.recipientPhone,
+      shippingAddress: address.shippingAddress,
+    });
+  }
+
   const loadCart = useCallback(async () => {
     const res = await fetch("/api/cart");
     const result = (await res.json()) as ApiResponse<CartData>;
@@ -59,6 +80,28 @@ export default function CheckoutPage() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadCart();
   }, [loadCart]);
+
+  useEffect(() => {
+    if (status !== "ready") return;
+    void (async () => {
+      const res = await fetch("/api/addresses");
+      const result = (await res.json()) as ApiResponse<AddressOption[]>;
+      if (!isApiSuccess(result) || result.data.length === 0) return;
+      setAddresses(result.data);
+      // 表单还是空的才预填默认（或第一个）地址，不覆盖用户已输入的内容
+      const preferred = result.data.find((a) => a.isDefault) ?? result.data[0];
+      setSelectedAddressId(String(preferred.id));
+      setForm((prev) =>
+        prev.recipientName || prev.recipientPhone || prev.shippingAddress
+          ? prev
+          : {
+              recipientName: preferred.recipientName,
+              recipientPhone: preferred.recipientPhone,
+              shippingAddress: preferred.shippingAddress,
+            },
+      );
+    })();
+  }, [status]);
 
   function update(field: keyof typeof form) {
     return (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
@@ -163,6 +206,25 @@ export default function CheckoutPage() {
         className="space-y-4 rounded-xl border border-black/10 p-5 dark:border-white/15"
       >
         <h2 className="font-semibold">收货信息</h2>
+
+        {addresses.length > 0 && (
+          <select
+            value={selectedAddressId}
+            onChange={(e) => {
+              setSelectedAddressId(e.target.value);
+              if (e.target.value) applyAddress(Number(e.target.value));
+            }}
+            className="w-full rounded-lg border border-black/15 px-3 py-2 text-sm dark:border-white/20"
+          >
+            {addresses.map((address) => (
+              <option key={address.id} value={address.id}>
+                {address.recipientName} · {address.recipientPhone} · {address.shippingAddress}
+                {address.isDefault ? "（默认）" : ""}
+              </option>
+            ))}
+            <option value="">手动填写新地址</option>
+          </select>
+        )}
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div>

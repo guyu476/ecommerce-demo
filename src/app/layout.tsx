@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "淘东商城 · Next.js 电商 Demo",
+  title: "鸟西商城 · Next.js 电商 Demo",
   description: "基于 Next.js 全栈的电商网站演示项目",
 };
 
@@ -27,6 +27,21 @@ const PROMOS = [
   "🔥 今日爆款限时直降",
   "🎁 新人注册即享新人价",
 ];
+
+// 可爱小鸟 Logo（与 favicon icon.svg 同款造型）
+export function BirdMark({ className = "h-10 w-10" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 64 64" className={className} aria-hidden>
+      <rect width="64" height="64" rx="16" fill="#E63946" />
+      <path d="M13 27 L20 22 L18 33 Z" fill="#ffffff" opacity="0.9" />
+      <circle cx="31" cy="33" r="15" fill="#ffffff" />
+      <ellipse cx="26" cy="37" rx="7" ry="5" fill="#FCA311" opacity="0.85" />
+      <circle cx="39" cy="28" r="2.6" fill="#14213D" />
+      <path d="M47 30 L55 33 L47 36 Z" fill="#FCA311" />
+      <path d="M26 20 C28 16 32 15 34 17 C31 18 29 20 28 23 Z" fill="#ffffff" opacity="0.9" />
+    </svg>
+  );
+}
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   const marqueeItems = [...PROMOS, ...PROMOS];
@@ -49,10 +64,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <header className="bg-ink text-white">
           <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-6">
             <Link href="/" className="flex items-center gap-3">
-              <span className="seal h-10 w-10 rounded-lg text-2xl">淘</span>
-              <span className="text-xl font-bold tracking-tight">淘东商城</span>
+              <BirdMark />
+              <span className="text-xl font-bold tracking-tight">鸟西商城</span>
             </Link>
-            <nav className="flex gap-6 text-sm">
+            <nav className="flex items-center gap-6 text-sm">
               <Link href="/" className="hover:opacity-70">
                 首页
               </Link>
@@ -64,7 +79,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         {children}
 
         <footer className="bg-mist py-10 text-center text-xs opacity-60 dark:bg-white/5">
-          淘东商城 · Next.js 全栈演示项目
+          鸟西商城 · Next.js 全栈演示项目
         </footer>
       </body>
     </html>

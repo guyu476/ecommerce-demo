@@ -1,4 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="14" fill="#E63946"/>
-  <text x="32" y="45" font-family="'Microsoft YaHei','PingFang SC','Noto Sans SC',sans-serif" font-size="38" font-weight="900" fill="#ffffff" text-anchor="middle">淘</text>
+  <rect width="64" height="64" rx="16" fill="#E63946"/>
+  <!-- 可爱小鸟：身体 + 翅膀 + 眼睛 + 喙 + 尾巴 -->
+  <path d="M13 27 L20 22 L18 33 Z" fill="#ffffff" opacity="0.9"/>
+  <circle cx="31" cy="33" r="15" fill="#ffffff"/>
+  <ellipse cx="26" cy="37" rx="7" ry="5" fill="#FCA311" opacity="0.85"/>
+  <circle cx="39" cy="28" r="2.6" fill="#14213D"/>
+  <path d="M47 30 L55 33 L47 36 Z" fill="#FCA311"/>
+  <path d="M26 20 C28 16 32 15 34 17 C31 18 29 20 28 23 Z" fill="#ffffff" opacity="0.9"/>
 </svg>

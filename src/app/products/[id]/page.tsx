@@ -18,7 +18,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
   const numericId = parseId(id);
   const product = numericId ? await getProductById(numericId) : null;
-  return { title: product ? `${product.name} · 淘东商城` : "商品不存在" };
+  return { title: product ? `${product.name} · 鸟西商城` : "商品不存在" };
 }
 
 export default async function ProductDetailPage({ params }: Props) {

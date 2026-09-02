@@ -17,12 +17,29 @@ model User {
   email        String     @unique @db.VarChar(200)
   passwordHash String     @map("password_hash") @db.VarChar(100)
   nickname     String     @db.VarChar(50)
-  avatar       String?    @db.VarChar(16)
+  avatar       String?    @db.Text
   createdAt    DateTime   @default(now()) @map("created_at")
   cartItems    CartItem[]
   orders       Order[]
+  addresses    Address[]
 
   @@map("users")
+}
+
+// 收货地址簿：下单时可选用，免重复填写
+model Address {
+  id              Int      @id @default(autoincrement())
+  userId          Int      @map("user_id")
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recipientName   String   @map("recipient_name") @db.VarChar(50)
+  recipientPhone  String   @map("recipient_phone") @db.VarChar(20)
+  shippingAddress String   @map("shipping_address") @db.VarChar(500)
+  isDefault       Boolean  @default(false) @map("is_default")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@map("addresses")
 }
 
 // ==================== 购物车 ====================

@@ -13,7 +13,7 @@ type Me = {
   avatar: string | null;
 } | null;
 
-// 头部用户区：「我的淘东」入口（含头像与购物车角标）
+// 头部用户区：「我的鸟西」入口（含头像与购物车角标）
 // 其他组件加购成功后 dispatch window 事件 "cart-changed" 即可触发角标刷新
 export function UserNav() {
   const router = useRouter();
@@ -73,10 +73,15 @@ export function UserNav() {
       {me ? (
         <>
           <Link href="/user" className="flex items-center gap-2 hover:opacity-70">
-            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/15 text-base">
-              {me.avatar ?? "🙂"}
-            </span>
-            我的淘东
+            {me.avatar?.startsWith("data:") ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={me.avatar} alt="头像" className="h-7 w-7 rounded-full object-cover" />
+            ) : (
+              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/15 text-base">
+                {me.avatar ?? "🙂"}
+              </span>
+            )}
+            我的鸟西
           </Link>
           <button type="button" onClick={logout} className="opacity-60 hover:opacity-100">
             退出

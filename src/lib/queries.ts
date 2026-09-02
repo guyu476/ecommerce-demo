@@ -7,13 +7,17 @@ export type CategoryWithCount = Category & { productCount: number };
 
 /**
  * 首页数据：在售分类 + 热卖商品。
- * 传入 categorySlug 时按分类过滤商品（分类可点击筛选）。
+ * 传入 categorySlug 按分类过滤、keyword 按商品名模糊搜索。
  * 数据库未就绪（未执行 migrate）时返回 null，由页面渲染引导提示而不是报错。
  */
-export async function getStorefrontData(categorySlug?: string): Promise<{
+export async function getStorefrontData(
+  categorySlug?: string,
+  keyword?: string,
+): Promise<{
   categories: CategoryWithCount[];
   products: ProductWithCategory[];
 } | null> {
+  const trimmed = keyword?.trim();
   try {
     const [categories, products] = await Promise.all([
       prisma.category.findMany({
@@ -26,10 +30,11 @@ export async function getStorefrontData(categorySlug?: string): Promise<{
         where: {
           status: "ON_SALE",
           ...(categorySlug ? { category: { slug: categorySlug } } : {}),
+          ...(trimmed ? { name: { contains: trimmed } } : {}),
         },
         include: { category: true },
         orderBy: [{ sales: "desc" }, { createdAt: "desc" }],
-        take: 12,
+        take: 24,
       }),
     ]);
 

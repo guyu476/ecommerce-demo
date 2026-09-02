@@ -73,7 +73,8 @@ function CategoryTicket({
 export default async function Home({ searchParams }: PageProps<"/">) {
   const params = await searchParams;
   const categorySlug = typeof params.category === "string" ? params.category : undefined;
-  const data = await getStorefrontData(categorySlug);
+  const keyword = typeof params.keyword === "string" ? params.keyword : undefined;
+  const data = await getStorefrontData(categorySlug, keyword);
 
   if (!data) {
     return (
@@ -88,6 +89,36 @@ export default async function Home({ searchParams }: PageProps<"/">) {
 
   return (
     <main className="mx-auto w-full max-w-6xl flex-1 space-y-20 px-8 py-12">
+      {/* 固定搜索栏：滚动时吸顶，随时可搜 */}
+      <div className="sticky top-0 z-20 -mx-8 -mt-12 mb-[-40px] border-b border-black/5 bg-paper/90 px-8 py-4 backdrop-blur dark:border-white/10 dark:bg-[#0b1220]/90">
+        <form action="/" method="get" className="mx-auto flex max-w-2xl gap-2">
+          {categorySlug && <input type="hidden" name="category" value={categorySlug} />}
+          <input
+            type="search"
+            name="keyword"
+            defaultValue={keyword ?? ""}
+            placeholder="搜索商品名称，如：手机 / 苹果 / 键盘…"
+            className="flex-1 rounded-full border border-black/15 px-5 py-2.5 text-sm outline-none focus:border-promo dark:border-white/20"
+          />
+          <button
+            type="submit"
+            className="rounded-full bg-ink px-7 text-sm font-medium text-white transition-colors hover:bg-ink-soft"
+          >
+            搜索
+          </button>
+        </form>
+      </div>
+
+      {keyword && (
+        <p className="text-sm opacity-70">
+          搜索「<span className="font-semibold text-promo">{keyword}</span>」找到 {products.length}{" "}
+          件商品
+          <Link href="/" className="ml-3 opacity-60 hover:opacity-100 hover:underline">
+            清除搜索
+          </Link>
+        </p>
+      )}
+
       {products.length > 0 && (
         <HeroCarousel
           slides={products.slice(0, 3).map((product) => ({
