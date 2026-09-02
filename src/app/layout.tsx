@@ -24,8 +24,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="zh-CN" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col">
         <header className="sticky top-0 z-10 bg-ink text-white">
-          <div className="mx-auto flex h-14 w-full max-w-5xl items-center justify-between px-6">
-            <Link href="/" className="text-lg font-bold tracking-tight">
+          <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-6">
+            <Link href="/" className="text-xl font-bold tracking-tight">
               🛒 ecommerce-demo 商城
             </Link>
             <nav className="flex gap-5 text-sm">
@@ -37,7 +37,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           </div>
         </header>
         {children}
-        <footer className="bg-mist py-6 text-center text-xs opacity-60 dark:bg-white/5">
+        <footer className="bg-mist py-10 text-center text-xs opacity-60 dark:bg-white/5">
           ecommerce-demo · Next.js 全栈演示项目
         </footer>
       </body>

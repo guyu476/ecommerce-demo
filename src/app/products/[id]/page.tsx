@@ -41,7 +41,7 @@ export default async function ProductDetailPage({ params }: Props) {
   if (product === null) notFound();
 
   return (
-    <main className="mx-auto w-full max-w-4xl flex-1 px-6 py-8">
+    <main className="mx-auto w-full max-w-4xl flex-1 px-6 py-12">
       <nav className="mb-6 text-sm opacity-60">
         <Link href="/" className="hover:underline">
           首页
@@ -56,7 +56,7 @@ export default async function ProductDetailPage({ params }: Props) {
         <span>商品详情</span>
       </nav>
 
-      <div className="grid gap-8 sm:grid-cols-2">
+      <div className="grid gap-12 sm:grid-cols-2">
         <div className="flex aspect-square items-center justify-center rounded-2xl bg-mist text-[120px] ">
           {product.category?.icon ?? "🛍️"}
         </div>
@@ -64,7 +64,7 @@ export default async function ProductDetailPage({ params }: Props) {
         <div className="flex flex-col gap-4">
           <h1 className="text-xl font-bold leading-7">{product.name}</h1>
 
-          <p className="font-mono text-3xl font-bold text-promo">{formatPrice(product.price)}</p>
+          <p className="font-mono text-4xl font-bold text-promo">{formatPrice(product.price)}</p>
 
           <ul className="flex gap-4 text-sm opacity-60">
             <li>已售 {formatSales(product.sales)} 件</li>

@@ -14,10 +14,10 @@ export function ProductCard({ product }: { product: ProductWithCategory }) {
           {product.category?.icon ?? "🛍️"}
         </span>
       </div>
-      <div className="space-y-1 p-2.5">
+      <div className="space-y-2.5 p-4">
         <h3 className="line-clamp-2 min-h-10 text-sm leading-5">{product.name}</h3>
         <p className="flex items-baseline justify-between gap-2">
-          <span className="font-mono text-base font-bold text-promo">
+          <span className="font-mono text-lg font-bold text-promo">
             {formatPrice(product.price)}
           </span>
           <span className="text-xs opacity-50">已售 {formatSales(product.sales)}</span>

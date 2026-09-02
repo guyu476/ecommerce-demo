@@ -11,9 +11,9 @@ export const dynamic = "force-dynamic";
 // 板块标题：红色短竖条 + 粗标题，紧凑大气
 function SectionTitle({ children, extra }: { children: React.ReactNode; extra?: React.ReactNode }) {
   return (
-    <div className="mb-3 flex items-center justify-between">
-      <h2 className="flex items-center gap-2 text-base font-bold tracking-tight">
-        <span className="h-4 w-1 rounded-full bg-promo" />
+    <div className="mb-6 flex items-center justify-between">
+      <h2 className="flex items-center gap-3 text-2xl font-extrabold tracking-tight">
+        <span className="h-6 w-1.5 rounded-full bg-promo" />
         {children}
       </h2>
       {extra}
@@ -38,10 +38,10 @@ export default async function Home({ searchParams }: PageProps<"/">) {
   const activeCategory = categories.find((c) => c.slug === categorySlug);
 
   return (
-    <main className="mx-auto w-full max-w-5xl flex-1 space-y-6 px-6 py-6">
+    <main className="mx-auto w-full max-w-6xl flex-1 space-y-14 px-8 py-10">
       {products.length > 0 && (
         <HeroCarousel
-          products={products.slice(0, 3).map((product) => ({
+          slides={products.slice(0, 3).map((product) => ({
             id: product.id,
             name: product.name,
             price: Number(product.price),
@@ -57,7 +57,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
             <li>
               <Link
                 href="/"
-                className={`inline-block rounded-full px-4 py-1.5 text-sm transition-colors ${
+                className={`inline-block rounded-full px-6 py-2.5 text-sm transition-colors ${
                   activeCategory
                     ? "bg-white text-ink hover:bg-mist dark:bg-white/10 dark:text-white dark:hover:bg-white/20"
                     : "bg-ink text-white"
@@ -70,7 +70,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
               <li key={category.id}>
                 <Link
                   href={`/?category=${category.slug}`}
-                  className={`inline-block rounded-full px-4 py-1.5 text-sm transition-colors ${
+                  className={`inline-block rounded-full px-6 py-2.5 text-sm transition-colors ${
                     activeCategory?.id === category.id
                       ? "bg-ink text-white"
                       : "bg-white hover:bg-mist dark:bg-white/10 dark:hover:bg-white/20"
@@ -109,7 +109,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
             <p className="font-mono text-xs opacity-50">执行 npm run db:seed 导入演示数据</p>
           </div>
         ) : (
-          <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          <ul className="grid grid-cols-2 gap-7 sm:grid-cols-3 lg:grid-cols-4">
             {products.map((product) => (
               <li key={product.id}>
                 <ProductCard product={product} />
