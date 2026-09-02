@@ -24,10 +24,21 @@ cp .env.example .env     # 编辑 .env，把 DATABASE_URL 里的 PASSWORD 换成
 npm run db:migrate       # 首次执行会自动创建 ecommerce_demo 库并建表
                          # （会提示输入迁移名，如 init）
 
+npm run db:seed          # 导入演示数据（6 个分类 + 12 个商品，幂等可重复执行）
+
 npm run dev              # 启动开发服务器，打开 http://localhost:3000
 ```
 
 其他常用命令：`npm run db:studio`（可视化看数据）、`npm run db:generate`（改了 schema 后重新生成客户端）、`npm run build`（生产构建）。
+
+## 已实现页面
+
+| 路由             | 说明                                                      |
+| ---------------- | --------------------------------------------------------- |
+| `/`              | 商城首页：分类导航 + 热卖商品网格（服务端组件直查数据库） |
+| `/products/[id]` | 商品详情：价格、销量、库存、描述、加入购物车（占位）      |
+
+数据库未就绪时页面会显示引导提示，而不是白屏报错。
 
 ## 目录结构
 
@@ -36,18 +47,35 @@ src/
 ├── app/
 │   ├── api/                # API 路由（Route Handlers）
 │   │   ├── health/         #   GET  /api/health   健康检查
-│   │   └── products/       #   GET|POST /api/products
-│   ├── layout.tsx          # 根布局
+│   │   ├── categories/     #   GET  /api/categories   分类列表（含商品数）
+│   │   └── products/       #   商品接口（列表/新增/[id] 详情/更新/删除）
+│   ├── products/[id]/      # 商品详情页
+│   ├── layout.tsx          # 根布局（站点头部/底部）
 │   └── page.tsx            # 首页
-├── components/             # 通用组件（含服务端/客户端组件）
-├── lib/                    # 基础设施
+├── components/             # 通用组件（ProductCard、AddToCartButton 等）
+├── lib/
 │   ├── api-response.ts     #   统一响应 ok/fail + handleRoute 错误处理
-│   └── prisma.ts           #   PrismaClient 单例（直接 import { prisma } 使用）
-└── types/                  # 全局共享类型
+│   ├── prisma.ts           #   PrismaClient 单例
+│   ├── queries.ts          #   页面数据查询（服务端组件直查库）
+│   └── format.ts           #   金额/销量格式化
+└── types/
     └── api.ts              #   ApiResponse 响应结构定义
 prisma/
-└── schema.prisma           # 数据库模型（改完执行 npm run db:migrate）
+├── schema.prisma           # 数据模型：Category / Product（含状态枚举）
+└── seed.ts                 # 演示种子数据（npm run db:seed）
 ```
+
+## 接口列表
+
+| 方法   | 路径                 | 说明                                                                                                  |
+| ------ | -------------------- | ----------------------------------------------------------------------------------------------------- |
+| GET    | `/api/health`        | 健康检查                                                                                              |
+| GET    | `/api/categories`    | 分类列表（含 productCount）                                                                           |
+| GET    | `/api/products`      | 商品分页列表，支持 `page` `pageSize` `keyword` `categoryId` `status`（默认只看在售，传 `all` 查全部） |
+| POST   | `/api/products`      | 新增商品（Zod 请求体校验）                                                                            |
+| GET    | `/api/products/[id]` | 商品详情（不存在返回 404 业务码）                                                                     |
+| PATCH  | `/api/products/[id]` | 更新商品（部分字段，Zod 校验）                                                                        |
+| DELETE | `/api/products/[id]` | 删除商品                                                                                              |
 
 ## 接口规范
 
@@ -67,6 +95,7 @@ prisma/
 
 - HTTP 状态码表达传输层语义（400/401/403/404/422/500）
 - `code` 表达业务语义：`0` 成功；`4xx` 请求侧错误；`5xx` 服务端错误
+- Prisma 的记录不存在（P2025）已全局映射为 `404 / code 40404`
 
 ### 写接口的标准套路
 
@@ -93,6 +122,8 @@ prisma/
 - [x] 项目脚手架（create-next-app）
 - [x] 接口规范与错误处理基建
 - [x] Prisma + MySQL 接入配置
-- [ ] 商品模块完整 CRUD + 分类
+- [x] 商品模块 API（列表/详情/新增/更新/删除）+ 分类接口
+- [x] 商城首页 + 商品详情页（服务端组件直查库）
+- [x] 演示种子数据
 - [ ] 用户注册 / 登录（含鉴权）
 - [ ] 购物车、结算与订单流程

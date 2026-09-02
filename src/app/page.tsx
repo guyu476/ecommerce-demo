@@ -1,62 +1,66 @@
-import { ApiStatus } from "@/components/api-status";
+import { DbSetupNotice } from "@/components/db-setup-notice";
+import { ProductCard } from "@/components/product-card";
+import { getStorefrontData } from "@/lib/queries";
 
-const techStack = [
-  "Next.js 16 (App Router)",
-  "TypeScript",
-  "Tailwind CSS v4",
-  "Prisma ORM",
-  "MySQL",
-  "Zod 校验",
-];
+// 首页 = 商城门面：分类导航 + 热卖商品（服务端组件直查数据库）
+// 商品数据需要每次请求时拉取最新，强制动态渲染
+export const dynamic = "force-dynamic";
 
-const apiEndpoints = [
-  { method: "GET", path: "/api/health", desc: "健康检查" },
-  {
-    method: "GET",
-    path: "/api/products?page=1&pageSize=10",
-    desc: "商品分页列表（需先配置数据库）",
-  },
-  { method: "POST", path: "/api/products", desc: "新增商品（Zod 请求体校验）" },
-];
+export default async function Home() {
+  const data = await getStorefrontData();
 
-export default function Home() {
+  if (!data) {
+    return (
+      <main className="flex flex-1 items-center justify-center px-6 py-16">
+        <DbSetupNotice />
+      </main>
+    );
+  }
+
+  const { categories, products } = data;
+
   return (
-    <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col justify-center gap-8 px-6 py-16">
-      <header className="space-y-3">
-        <h1 className="text-3xl font-bold">ecommerce-demo</h1>
-        <p className="opacity-70">电商网站 Demo · Next.js 全栈项目框架</p>
-        <ul className="flex flex-wrap gap-2 text-xs">
-          {techStack.map((item) => (
-            <li
-              key={item}
-              className="rounded-full border border-black/10 px-3 py-1 dark:border-white/20"
-            >
-              {item}
-            </li>
-          ))}
-        </ul>
-      </header>
-
-      <ApiStatus />
-
-      <section className="space-y-2">
-        <h2 className="text-lg font-semibold">内置示例接口</h2>
-        <ul className="space-y-1 font-mono text-sm">
-          {apiEndpoints.map((api) => (
-            <li key={api.method + api.path} className="flex gap-3">
-              <span className="w-10 shrink-0 font-bold text-green-600 dark:text-green-400">
-                {api.method}
-              </span>
-              <span className="shrink-0">{api.path}</span>
-              <span className="opacity-60">{api.desc}</span>
-            </li>
-          ))}
-        </ul>
+    <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-8">
+      <section className="mb-8 rounded-2xl bg-gradient-to-r from-orange-500 to-amber-500 px-8 py-10 text-white">
+        <h1 className="text-2xl font-bold sm:text-3xl">精品好物 · 每日上新</h1>
+        <p className="mt-2 opacity-90">ecommerce-demo 商城，Next.js 全栈演示项目</p>
       </section>
 
-      <footer className="text-sm opacity-60">
-        下一步：填好 .env 里的 MySQL 密码 → npm run db:migrate 建库建表 →开始写业务。详见 README.md
-      </footer>
+      {categories.length > 0 && (
+        <section className="mb-8">
+          <h2 className="mb-3 text-lg font-semibold">商品分类</h2>
+          <ul className="flex flex-wrap gap-2">
+            {categories.map((category) => (
+              <li
+                key={category.id}
+                className="rounded-full border border-black/10 px-4 py-1.5 text-sm dark:border-white/15"
+              >
+                <span className="mr-1">{category.icon}</span>
+                {category.name}
+                <span className="ml-1.5 text-xs opacity-50">{category.productCount}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      <section>
+        <h2 className="mb-3 text-lg font-semibold">热卖商品</h2>
+        {products.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-black/15 p-10 text-center text-sm dark:border-white/20">
+            <p className="mb-2 opacity-70">还没有在售商品</p>
+            <p className="font-mono text-xs opacity-50">执行 npm run db:seed 导入演示数据</p>
+          </div>
+        ) : (
+          <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+            {products.map((product) => (
+              <li key={product.id}>
+                <ProductCard product={product} />
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </main>
   );
 }

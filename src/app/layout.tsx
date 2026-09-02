@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -20,7 +21,25 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="zh-CN" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
-      <body className="flex min-h-full flex-col">{children}</body>
+      <body className="flex min-h-full flex-col">
+        <header className="sticky top-0 z-10 border-b border-black/10 bg-white/80 backdrop-blur dark:border-white/15 dark:bg-zinc-950/80">
+          <div className="mx-auto flex h-14 w-full max-w-5xl items-center justify-between px-6">
+            <Link href="/" className="text-lg font-bold">
+              🛒 ecommerce-demo 商城
+            </Link>
+            <nav className="flex gap-5 text-sm">
+              <Link href="/" className="hover:opacity-70">
+                首页
+              </Link>
+              <span className="opacity-40">购物车（开发中）</span>
+            </nav>
+          </div>
+        </header>
+        {children}
+        <footer className="border-t border-black/10 py-6 text-center text-xs opacity-50 dark:border-white/15">
+          ecommerce-demo · Next.js 全栈演示项目
+        </footer>
+      </body>
     </html>
   );
 }

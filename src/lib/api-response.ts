@@ -56,7 +56,20 @@ export async function handleRoute(handler: () => Promise<NextResponse>): Promise
     if (error instanceof ZodError) {
       return fail("参数校验失败", 422, 422, toFieldErrors(error));
     }
+    // Prisma 更新/删除目标不存在（P2025）
+    if (isPrismaError(error, "P2025")) {
+      return fail("数据不存在", 40404, 404);
+    }
     console.error("[api] 未处理错误:", error);
     return fail("服务器内部错误", 500, 500);
   }
+}
+
+function isPrismaError(error: unknown, code: string): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: unknown }).code === code
+  );
 }
