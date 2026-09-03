@@ -65,14 +65,20 @@ export type ReviewWithUser = {
  * - null：数据库正常但商品不存在（页面应渲染 404）
  * - undefined：数据库不可用（页面应渲染连接引导）
  */
-export async function getProductById(
-  id: number,
-): Promise<(ProductWithCategory & { reviews: ReviewWithUser[] }) | null | undefined> {
+export async function getProductById(id: number): Promise<
+  | (ProductWithCategory & {
+      seller: { id: number; nickname: string } | null;
+      reviews: ReviewWithUser[];
+    })
+  | null
+  | undefined
+> {
   try {
     const product = await prisma.product.findUnique({
       where: { id },
       include: {
         category: true,
+        seller: { select: { id: true, nickname: true } },
         reviews: {
           orderBy: { createdAt: "desc" },
           take: 20,

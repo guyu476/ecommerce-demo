@@ -106,6 +106,7 @@ export default async function ProductDetailPage({ params }: Props) {
           <ul className="flex gap-5 text-sm opacity-60">
             <li>已售 {formatSales(product.sales)} 件</li>
             <li>{product.stock > 0 ? "现货" : "暂时缺货"}</li>
+            {product.seller && <li>店铺：{product.seller.nickname}</li>}
           </ul>
 
           {product.description && (

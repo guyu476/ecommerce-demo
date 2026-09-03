@@ -166,6 +166,30 @@ async function main() {
     },
   });
 
+  // 管理员账号：admin@example.com / admin123456
+  await prisma.user.upsert({
+    where: { email: "admin@example.com" },
+    update: {},
+    create: {
+      email: "admin@example.com",
+      nickname: "平台管理员",
+      role: "ADMIN",
+      passwordHash: await bcrypt.hash("admin123456", 10),
+    },
+  });
+
+  // 商家账号：merchant@example.com / merchant123456
+  const merchantUser = await prisma.user.upsert({
+    where: { email: "merchant@example.com" },
+    update: {},
+    create: {
+      email: "merchant@example.com",
+      nickname: "鸟西自营数码店",
+      role: "MERCHANT",
+      passwordHash: await bcrypt.hash("merchant123456", 10),
+    },
+  });
+
   // 分类按 slug 幂等写入
   const categoryMap = new Map<string, number>();
   for (const category of categories) {
@@ -177,20 +201,28 @@ async function main() {
     categoryMap.set(category.slug, record.id);
   }
 
-  // 商品按名称幂等写入（已存在但缺多图的补齐图片，不重复堆积）
+  // 商品按名称幂等写入（已存在但缺多图/缺商家的补齐，不重复堆积）
+  // 商家名下商品：手机数码 + 电脑办公两个分类（演示商家店铺）
   let created = 0;
   let updatedImages = 0;
   const productIdByName = new Map<string, number>();
   for (const product of products) {
     const categoryIcon = categories.find((c) => c.slug === product.categorySlug)?.icon ?? "🛍️";
     const images = JSON.stringify(buildImages(categoryIcon, created + products.indexOf(product)));
+    const sellerId =
+      product.categorySlug === "digital" || product.categorySlug === "computer"
+        ? merchantUser.id
+        : null;
     const existing = await prisma.product.findFirst({
       where: { name: product.name },
     });
     if (existing) {
       productIdByName.set(product.name, existing.id);
-      if (!existing.images) {
-        await prisma.product.update({ where: { id: existing.id }, data: { images } });
+      const patch: Record<string, unknown> = {};
+      if (!existing.images) patch.images = images;
+      if (existing.sellerId === null && sellerId !== null) patch.sellerId = sellerId;
+      if (Object.keys(patch).length > 0) {
+        await prisma.product.update({ where: { id: existing.id }, data: patch });
         updatedImages += 1;
       }
       continue;
@@ -204,6 +236,7 @@ async function main() {
         sales: product.sales,
         status: ProductStatus.ON_SALE,
         categoryId: categoryMap.get(product.categorySlug),
+        sellerId,
         images,
       },
     });

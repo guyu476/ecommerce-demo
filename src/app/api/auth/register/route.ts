@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
         nickname: body.nickname,
         passwordHash: await bcrypt.hash(body.password, 10),
       },
-      select: { id: true, email: true, phone: true, nickname: true },
+      select: { id: true, email: true, phone: true, nickname: true, role: true },
     });
 
     const token = await createSessionToken(user.id);

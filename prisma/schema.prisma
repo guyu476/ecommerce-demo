@@ -12,18 +12,28 @@ datasource db {
 
 // ==================== 用户 ====================
 
+enum UserRole {
+  USER
+  MERCHANT
+  ADMIN
+
+  @@map("user_role")
+}
+
 model User {
   id           Int        @id @default(autoincrement())
   email        String?    @unique @db.VarChar(200)
   phone        String?    @unique @db.VarChar(20)
   passwordHash String     @map("password_hash") @db.VarChar(100)
   nickname     String     @db.VarChar(50)
+  role         UserRole   @default(USER)
   avatar       String?    @db.Text
   createdAt    DateTime   @default(now()) @map("created_at")
   cartItems    CartItem[]
   orders       Order[]
   reviews      Review[]
   addresses    Address[]
+  products     Product[]
 
   @@map("users")
 }
@@ -95,6 +105,8 @@ model Product {
   status      ProductStatus @default(DRAFT)
   categoryId  Int?
   category    Category?     @relation(fields: [categoryId], references: [id])
+  sellerId    Int?          @map("seller_id")
+  seller      User?         @relation(fields: [sellerId], references: [id])
   createdAt   DateTime      @default(now()) @map("created_at")
   updatedAt   DateTime      @updatedAt @map("updated_at")
   cartItems   CartItem[]

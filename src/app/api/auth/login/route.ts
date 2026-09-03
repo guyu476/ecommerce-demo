@@ -25,7 +25,13 @@ export async function POST(request: NextRequest) {
 
     const token = await createSessionToken(user.id);
     const response = ok(
-      { id: user.id, email: user.email, phone: user.phone, nickname: user.nickname },
+      {
+        id: user.id,
+        email: user.email,
+        phone: user.phone,
+        nickname: user.nickname,
+        role: user.role,
+      },
       "登录成功",
     );
     setSessionCookie(response, token);

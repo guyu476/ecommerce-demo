@@ -15,11 +15,14 @@ function getSecret(): Uint8Array {
   return new TextEncoder().encode(secret);
 }
 
+export type Role = "USER" | "MERCHANT" | "ADMIN";
+
 export interface SessionUser {
   id: number;
   email: string | null;
   phone: string | null;
   nickname: string;
+  role: Role;
   avatar: string | null;
 }
 
@@ -44,7 +47,7 @@ export async function getSessionUser(): Promise<SessionUser | null> {
 
     return await prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, email: true, phone: true, nickname: true, avatar: true },
+      select: { id: true, email: true, phone: true, nickname: true, role: true, avatar: true },
     });
   } catch {
     return null;
@@ -56,6 +59,15 @@ export async function requireUser(): Promise<SessionUser> {
   const user = await getSessionUser();
   if (!user) {
     throw new ApiError("请先登录", 40101, 401);
+  }
+  return user;
+}
+
+/** 角色守卫：任一命中角色即可，否则 403 */
+export async function requireRole(...roles: Role[]): Promise<SessionUser> {
+  const user = await requireUser();
+  if (!roles.includes(user.role)) {
+    throw new ApiError("没有权限执行该操作", 40301, 403);
   }
   return user;
 }

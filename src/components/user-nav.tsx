@@ -8,8 +8,9 @@ import { isApiSuccess } from "@/types/api";
 
 type Me = {
   id: number;
-  email: string;
+  email: string | null;
   nickname: string;
+  role: string;
   avatar: string | null;
 } | null;
 
@@ -72,6 +73,16 @@ export function UserNav() {
       </Link>
       {me ? (
         <>
+          {me.role === "MERCHANT" && (
+            <Link href="/merchant" className="hover:opacity-70">
+              商家中心
+            </Link>
+          )}
+          {me.role === "ADMIN" && (
+            <Link href="/admin" className="hover:opacity-70">
+              管理后台
+            </Link>
+          )}
           <Link href="/user" className="flex items-center gap-2 hover:opacity-70">
             {me.avatar?.startsWith("data:") ? (
               // eslint-disable-next-line @next/next/no-img-element
