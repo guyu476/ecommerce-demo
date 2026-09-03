@@ -92,9 +92,6 @@ export default async function ProductDetailPage({ params }: Props) {
             className="washi absolute -top-3 left-1/2 h-7 w-28 -translate-x-1/2 rotate-2 rounded-sm"
           />
           <ProductGallery images={images} fallbackIcon={product.category?.icon ?? "🛍️"} />
-          <p className="pt-2.5 pb-1 text-center font-mono text-xs opacity-50">
-            NO.{String(product.id).padStart(4, "0")}
-          </p>
         </div>
 
         <div className="flex flex-col gap-5">
@@ -108,7 +105,6 @@ export default async function ProductDetailPage({ params }: Props) {
 
           <ul className="flex gap-5 text-sm opacity-60">
             <li>已售 {formatSales(product.sales)} 件</li>
-            <li>库存 {product.stock} 件</li>
             <li>{product.stock > 0 ? "现货" : "暂时缺货"}</li>
           </ul>
 

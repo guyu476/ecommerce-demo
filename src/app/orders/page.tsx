@@ -50,16 +50,20 @@ function unreviewedItems(order: Order): OrderItem[] {
   return order.items.filter((item) => !reviewed.has(item.productId));
 }
 
-type Tab = "all" | "pending" | "unreviewed";
+type Tab = "all" | "pending" | "paid" | "shipped" | "unreviewed";
 
 const TABS: { key: Tab; label: string }[] = [
   { key: "all", label: "全部订单" },
   { key: "pending", label: "待付款" },
+  { key: "paid", label: "待发货" },
+  { key: "shipped", label: "待收货" },
   { key: "unreviewed", label: "待评价" },
 ];
 
 function tabQuery(tab: Tab): string {
   if (tab === "pending") return "&status=PENDING_PAYMENT";
+  if (tab === "paid") return "&status=PAID";
+  if (tab === "shipped") return "&status=SHIPPED";
   if (tab === "unreviewed") return "&filter=unreviewed";
   return "";
 }
@@ -69,8 +73,16 @@ function initialTab(): Tab {
   if (typeof window === "undefined") return "all";
   const search = new URLSearchParams(window.location.search);
   if (search.get("filter") === "unreviewed") return "unreviewed";
-  if (search.get("status") === "PENDING_PAYMENT") return "pending";
-  return "all";
+  switch (search.get("status")) {
+    case "PENDING_PAYMENT":
+      return "pending";
+    case "PAID":
+      return "paid";
+    case "SHIPPED":
+      return "shipped";
+    default:
+      return "all";
+  }
 }
 
 export default function OrdersPage() {
@@ -197,6 +209,8 @@ export default function OrdersPage() {
           <p className="mb-2 text-4xl">🧾</p>
           <p className="mb-4 opacity-60">
             {tab === "pending" && "没有待付款的订单"}
+            {tab === "paid" && "没有待发货的订单"}
+            {tab === "shipped" && "没有待收货的订单"}
             {tab === "unreviewed" && "没有待评价的订单，买过的都评完啦"}
             {tab === "all" && "还没有订单"}
           </p>
