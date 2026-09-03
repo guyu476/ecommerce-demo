@@ -35,6 +35,13 @@ export default function UserCenterPage() {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [orderCounts, setOrderCounts] = useState<{
+    all: number;
+    pending: number;
+    paid: number;
+    shipped: number;
+    unreviewed: number;
+  } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadMe = useCallback(async () => {
@@ -45,6 +52,16 @@ export default function UserCenterPage() {
       setNickname(result.data.nickname);
       setAvatar(result.data.avatar ?? "🙂");
       setStatus("ready");
+
+      // 各状态订单数量（入口红点）
+      const countsRes = (await fetch("/api/orders/counts").then((r) => r.json())) as ApiResponse<{
+        all: number;
+        pending: number;
+        paid: number;
+        shipped: number;
+        unreviewed: number;
+      }>;
+      if (isApiSuccess(countsRes)) setOrderCounts(countsRes.data);
     } else {
       setStatus("guest");
     }
@@ -238,21 +255,42 @@ export default function UserCenterPage() {
       {/* 地址簿 */}
       <AddressManager />
 
-      {/* 我的订单：待付款 / 全部订单 / 待评价 三入口 */}
+      {/* 我的订单：全部入口 + 未处理数量红点 */}
       <section className="overflow-hidden rounded-2xl border border-black/10 dark:border-white/15">
         <h2 className="bg-mist px-6 py-3 text-sm font-semibold dark:bg-white/5">我的订单</h2>
         <ul className="divide-y divide-black/5 dark:divide-white/10">
           {[
-            { label: "⏳ 待付款", href: "/orders?status=PENDING_PAYMENT" },
-            { label: "🧾 全部订单", href: "/orders" },
-            { label: "✍️ 待评价", href: "/orders?filter=unreviewed" },
+            { label: "🧾 全部订单", href: "/orders", count: orderCounts?.all ?? 0 },
+            {
+              label: "⏳ 待付款",
+              href: "/orders?status=PENDING_PAYMENT",
+              count: orderCounts?.pending ?? 0,
+            },
+            { label: "📦 待发货", href: "/orders?status=PAID", count: orderCounts?.paid ?? 0 },
+            {
+              label: "🚚 待收货",
+              href: "/orders?status=SHIPPED",
+              count: orderCounts?.shipped ?? 0,
+            },
+            {
+              label: "✍️ 待评价",
+              href: "/orders?filter=unreviewed",
+              count: orderCounts?.unreviewed ?? 0,
+            },
           ].map((entry) => (
             <li key={entry.href}>
               <Link
                 href={entry.href}
                 className="flex items-center justify-between px-6 py-4 text-sm transition-colors hover:bg-mist dark:hover:bg-white/5"
               >
-                <span>{entry.label}</span>
+                <span className="flex items-center gap-2">
+                  {entry.label}
+                  {entry.count > 0 && (
+                    <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-promo px-1.5 text-[10px] font-bold text-white">
+                      {entry.count > 99 ? "99+" : entry.count}
+                    </span>
+                  )}
+                </span>
                 <span className="opacity-40">›</span>
               </Link>
             </li>
