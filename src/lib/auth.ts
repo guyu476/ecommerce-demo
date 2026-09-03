@@ -17,7 +17,8 @@ function getSecret(): Uint8Array {
 
 export interface SessionUser {
   id: number;
-  email: string;
+  email: string | null;
+  phone: string | null;
   nickname: string;
   avatar: string | null;
 }
@@ -43,7 +44,7 @@ export async function getSessionUser(): Promise<SessionUser | null> {
 
     return await prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, email: true, nickname: true, avatar: true },
+      select: { id: true, email: true, phone: true, nickname: true, avatar: true },
     });
   } catch {
     return null;

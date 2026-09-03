@@ -14,7 +14,8 @@ datasource db {
 
 model User {
   id           Int        @id @default(autoincrement())
-  email        String     @unique @db.VarChar(200)
+  email        String?    @unique @db.VarChar(200)
+  phone        String?    @unique @db.VarChar(20)
   passwordHash String     @map("password_hash") @db.VarChar(100)
   nickname     String     @db.VarChar(50)
   avatar       String?    @db.Text

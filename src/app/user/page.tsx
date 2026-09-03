@@ -9,7 +9,8 @@ import { isApiSuccess } from "@/types/api";
 
 type Me = {
   id: number;
-  email: string;
+  email: string | null;
+  phone: string | null;
   nickname: string;
   avatar: string | null;
 };
@@ -184,7 +185,7 @@ export default function UserCenterPage() {
           </span>
           <div>
             <p className="text-lg font-bold">{me?.nickname}</p>
-            <p className="text-sm opacity-50">{me?.email}</p>
+            <p className="text-sm opacity-50">{me?.email ?? me?.phone}</p>
           </div>
         </div>
 

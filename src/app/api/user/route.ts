@@ -26,7 +26,7 @@ export async function PATCH(request: NextRequest) {
     const updated = await prisma.user.update({
       where: { id: user.id },
       data,
-      select: { id: true, email: true, nickname: true, avatar: true },
+      select: { id: true, email: true, phone: true, nickname: true, avatar: true },
     });
 
     return ok(updated, "保存成功");

@@ -6,11 +6,16 @@ import { FormEvent, useState } from "react";
 import type { ApiResponse } from "@/types/api";
 
 // 注册页（与登录页同风格 · Tab 头部 + 灰底大输入框 + 协议勾选）
-// 注册成功即自动登录（后端直接种会话 cookie）
+// 邮箱注册 / 手机注册均为真实注册（手机号即账号，无需真实短信），注册成功即自动登录
 export default function RegisterPage() {
   const router = useRouter();
   const [tab, setTab] = useState<"email" | "phone">("email");
-  const [form, setForm] = useState({ email: "", nickname: "", password: "" });
+  const [form, setForm] = useState({
+    email: "",
+    phone: "",
+    nickname: "",
+    password: "",
+  });
   const [agreed, setAgreed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -31,11 +36,17 @@ export default function RegisterPage() {
     setError(null);
     setFieldErrors({});
 
+    // 按 Tab 提交对应标识字段
+    const payload =
+      tab === "email"
+        ? { email: form.email, nickname: form.nickname, password: form.password }
+        : { phone: form.phone, nickname: form.nickname, password: form.password };
+
     try {
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify(payload),
       });
       const result = (await res.json()) as ApiResponse;
 
@@ -57,11 +68,26 @@ export default function RegisterPage() {
   const inputClass =
     "w-full rounded-xl bg-mist px-5 py-4 text-sm outline-none transition-shadow placeholder:text-black/35 focus:ring-2 focus:ring-promo/30 dark:bg-white/10 dark:placeholder:text-white/35";
 
-  const fields = [
-    { key: "email" as const, type: "email", placeholder: "请输入邮箱" },
-    { key: "nickname" as const, type: "text", placeholder: "请输入昵称" },
-    { key: "password" as const, type: "password", placeholder: "请设置登录密码（至少 8 位）" },
-  ];
+  const fields =
+    tab === "email"
+      ? [
+          { key: "email" as const, type: "email", placeholder: "请输入邮箱" },
+          { key: "nickname" as const, type: "text", placeholder: "请输入昵称" },
+          {
+            key: "password" as const,
+            type: "password",
+            placeholder: "请设置登录密码（至少 8 位）",
+          },
+        ]
+      : [
+          { key: "phone" as const, type: "tel", placeholder: "请输入手机号" },
+          { key: "nickname" as const, type: "text", placeholder: "请输入昵称" },
+          {
+            key: "password" as const,
+            type: "password",
+            placeholder: "请设置登录密码（至少 8 位）",
+          },
+        ];
 
   return (
     <main className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center px-6 py-16">
@@ -88,42 +114,34 @@ export default function RegisterPage() {
         </button>
       </div>
 
-      {tab === "phone" ? (
-        <p className="rounded-xl bg-mist p-8 text-center text-sm leading-6 opacity-70 dark:bg-white/10">
-          演示环境暂未开通手机注册
-          <br />
-          请切换到「邮箱注册」
-        </p>
-      ) : (
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {fields.map((field) => (
-            <div key={field.key}>
-              <input
-                id={field.key}
-                type={field.type}
-                required
-                value={form[field.key]}
-                onChange={update(field.key)}
-                placeholder={field.placeholder}
-                className={inputClass}
-              />
-              {fieldErrors[field.key] && (
-                <p className="mt-1 text-xs text-red-500">{fieldErrors[field.key]}</p>
-              )}
-            </div>
-          ))}
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {fields.map((field) => (
+          <div key={field.key}>
+            <input
+              id={field.key}
+              type={field.type}
+              required
+              value={form[field.key]}
+              onChange={update(field.key)}
+              placeholder={field.placeholder}
+              className={inputClass}
+            />
+            {fieldErrors[field.key] && (
+              <p className="mt-1 text-xs text-red-500">{fieldErrors[field.key]}</p>
+            )}
+          </div>
+        ))}
 
-          {error && <p className="text-sm text-red-500">{error}</p>}
+        {error && <p className="text-sm text-red-500">{error}</p>}
 
-          <button
-            type="submit"
-            disabled={submitting}
-            className="w-full rounded-xl bg-promo py-4 text-lg font-bold tracking-[0.3em] text-white transition-colors hover:bg-promo-deep disabled:opacity-50"
-          >
-            {submitting ? "注册中…" : "注 册"}
-          </button>
-        </form>
-      )}
+        <button
+          type="submit"
+          disabled={submitting}
+          className="w-full rounded-xl bg-promo py-4 text-lg font-bold tracking-[0.3em] text-white transition-colors hover:bg-promo-deep disabled:opacity-50"
+        >
+          {submitting ? "注册中…" : "注 册"}
+        </button>
+      </form>
 
       {/* 协议勾选 */}
       <label className="mt-8 flex cursor-pointer items-start justify-center gap-2 text-xs leading-5 opacity-75">
