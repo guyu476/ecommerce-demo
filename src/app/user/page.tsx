@@ -260,7 +260,7 @@ export default function UserCenterPage() {
         <h2 className="bg-mist px-6 py-3 text-sm font-semibold dark:bg-white/5">我的订单</h2>
         <ul className="divide-y divide-black/5 dark:divide-white/10">
           {[
-            { label: "🧾 全部订单", href: "/orders", count: orderCounts?.all ?? 0 },
+            { label: "🧾 全部订单", href: "/orders", count: 0 },
             {
               label: "⏳ 待付款",
               href: "/orders?status=PENDING_PAYMENT",
