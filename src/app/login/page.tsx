@@ -235,7 +235,17 @@ export default function LoginPage() {
         </span>
       </label>
 
-      <p className="mt-5 text-center text-xs opacity-40">演示账号：demo@example.com / demo123456</p>
+      {/* 演示账号速查 */}
+      <div className="mt-6 rounded-xl bg-mist p-4 text-xs leading-6 dark:bg-white/10">
+        <p className="mb-1 font-semibold opacity-70">演示账号速查（密码同账号前缀）</p>
+        <p className="font-mono opacity-70">
+          用户 demo@example.com / demo123456
+          <br />
+          商家 merchant@example.com / merchant123456
+          <br />
+          管理员 admin@example.com / admin123456
+        </p>
+      </div>
     </main>
   );
 }
