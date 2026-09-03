@@ -238,19 +238,25 @@ export default function UserCenterPage() {
       {/* 地址簿 */}
       <AddressManager />
 
-      {/* 快捷入口 */}
+      {/* 我的订单：待付款 / 全部订单 / 待评价 三入口 */}
       <section className="overflow-hidden rounded-2xl border border-black/10 dark:border-white/15">
-        <h2 className="bg-mist px-6 py-3 text-sm font-semibold dark:bg-white/5">我的服务</h2>
+        <h2 className="bg-mist px-6 py-3 text-sm font-semibold dark:bg-white/5">我的订单</h2>
         <ul className="divide-y divide-black/5 dark:divide-white/10">
-          <li>
-            <Link
-              href="/orders"
-              className="flex items-center justify-between px-6 py-4 text-sm transition-colors hover:bg-mist dark:hover:bg-white/5"
-            >
-              <span>📦 我的订单</span>
-              <span className="opacity-40">›</span>
-            </Link>
-          </li>
+          {[
+            { label: "⏳ 待付款", href: "/orders?status=PENDING_PAYMENT" },
+            { label: "🧾 全部订单", href: "/orders" },
+            { label: "✍️ 待评价", href: "/orders?filter=unreviewed" },
+          ].map((entry) => (
+            <li key={entry.href}>
+              <Link
+                href={entry.href}
+                className="flex items-center justify-between px-6 py-4 text-sm transition-colors hover:bg-mist dark:hover:bg-white/5"
+              >
+                <span>{entry.label}</span>
+                <span className="opacity-40">›</span>
+              </Link>
+            </li>
+          ))}
         </ul>
       </section>
 

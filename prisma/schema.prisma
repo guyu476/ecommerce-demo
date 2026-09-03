@@ -21,6 +21,7 @@ model User {
   createdAt    DateTime   @default(now()) @map("created_at")
   cartItems    CartItem[]
   orders       Order[]
+  reviews      Review[]
   addresses    Address[]
 
   @@map("users")
@@ -87,6 +88,7 @@ model Product {
   description String?       @db.Text
   price       Decimal       @db.Decimal(10, 2)
   image       String?       @db.VarChar(500)
+  images      String?       @db.Text
   stock       Int           @default(0)
   sales       Int           @default(0)
   status      ProductStatus @default(DRAFT)
@@ -96,10 +98,29 @@ model Product {
   updatedAt   DateTime      @updatedAt @map("updated_at")
   cartItems   CartItem[]
   orderItems  OrderItem[]
+  reviews     Review[]
 
   @@index([categoryId])
   @@index([status])
   @@map("products")
+}
+
+// 商品评价：一单一商品一条评价（订单完成后可评）
+model Review {
+  id        Int      @id @default(autoincrement())
+  orderId   Int      @map("order_id")
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  userId    Int      @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId Int      @map("product_id")
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  rating    Int
+  content   String   @db.VarChar(500)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([orderId, productId])
+  @@index([productId])
+  @@map("reviews")
 }
 
 // ==================== 订单 ====================
@@ -125,6 +146,7 @@ model Order {
   recipientPhone  String      @map("recipient_phone") @db.VarChar(20)
   shippingAddress String      @map("shipping_address") @db.VarChar(500)
   items           OrderItem[]
+  reviews         Review[]
   idempotencyKeys IdempotencyKey[]
   createdAt       DateTime    @default(now()) @map("created_at")
   updatedAt       DateTime    @updatedAt @map("updated_at")

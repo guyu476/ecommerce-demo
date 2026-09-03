@@ -23,7 +23,13 @@ export async function GET(_request: NextRequest, context: Context) {
     const { id } = await context.params;
     const product = await prisma.product.findUnique({
       where: { id: parseId(id) },
-      include: { category: true },
+      include: {
+        category: true,
+        reviews: {
+          orderBy: { createdAt: "desc" },
+          include: { user: { select: { nickname: true, avatar: true } } },
+        },
+      },
     });
 
     if (!product) {

@@ -51,20 +51,59 @@ export async function getStorefrontData(
   }
 }
 
+export type ReviewWithUser = {
+  id: number;
+  rating: number;
+  content: string;
+  createdAt: string;
+  user: { nickname: string; avatar: string | null };
+};
+
 /**
  * 商品详情。返回值三态：
- * - ProductWithCategory：正常
+ * - ProductWithCategory：正常（reviews 为商品全部评价，含用户昵称/头像）
  * - null：数据库正常但商品不存在（页面应渲染 404）
  * - undefined：数据库不可用（页面应渲染连接引导）
  */
-export async function getProductById(id: number): Promise<ProductWithCategory | null | undefined> {
+export async function getProductById(
+  id: number,
+): Promise<(ProductWithCategory & { reviews: ReviewWithUser[] }) | null | undefined> {
   try {
-    return await prisma.product.findUnique({
+    const product = await prisma.product.findUnique({
       where: { id },
-      include: { category: true },
+      include: {
+        category: true,
+        reviews: {
+          orderBy: { createdAt: "desc" },
+          take: 20,
+          include: { user: { select: { nickname: true, avatar: true } } },
+        },
+      },
     });
+    if (!product) return null;
+    return {
+      ...product,
+      reviews: product.reviews.map((review) => ({
+        id: review.id,
+        rating: review.rating,
+        content: review.content,
+        createdAt: review.createdAt.toISOString(),
+        user: review.user,
+      })),
+    };
   } catch (error) {
     console.error("[storefront] 商品详情查询失败（可能尚未执行 db:migrate）:", error);
     return undefined;
+  }
+}
+
+/** 解析商品多图（JSON 数组），空/损坏时返回空数组 */
+export function parseProductImages(images: string | null): string[] {
+  if (!images) return [];
+  try {
+    const parsed = JSON.parse(images);
+    return Array.isArray(parsed) ? parsed.filter((x) => typeof x === "string") : [];
+  } catch {
+    return [];
   }
 }

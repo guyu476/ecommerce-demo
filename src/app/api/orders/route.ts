@@ -129,10 +129,15 @@ export async function POST(request: NextRequest) {
 }
 
 // ============ GET /api/orders 当前用户订单分页列表 ============
+// 查询参数：page、pageSize、status（订单状态或 all）、filter=unreviewed（待评价）
 
 const listQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(50).default(10),
+  status: z
+    .enum(["PENDING_PAYMENT", "PAID", "SHIPPED", "COMPLETED", "CANCELLED", "all"])
+    .default("all"),
+  filter: z.enum(["all", "unreviewed"]).default("all"),
 });
 
 export const dynamic = "force-dynamic";
@@ -141,13 +146,24 @@ export async function GET(request: NextRequest) {
   return handleRoute(async () => {
     const user = await requireUser();
     const query = listQuerySchema.parse(Object.fromEntries(request.nextUrl.searchParams));
-    const where = { userId: user.id };
+
+    const where = {
+      userId: user.id,
+      ...(query.status !== "all" ? { status: query.status } : {}),
+      // 待评价：已发货/已完成且还没有任何评价
+      ...(query.filter === "unreviewed"
+        ? {
+            status: { in: ["SHIPPED", "COMPLETED"] as ("SHIPPED" | "COMPLETED")[] },
+            reviews: { none: {} },
+          }
+        : {}),
+    };
 
     const [total, list] = await prisma.$transaction([
       prisma.order.count({ where }),
       prisma.order.findMany({
         where,
-        include: { items: true },
+        include: { items: true, reviews: { select: { productId: true } } },
         orderBy: { createdAt: "desc" },
         skip: (query.page - 1) * query.pageSize,
         take: query.pageSize,

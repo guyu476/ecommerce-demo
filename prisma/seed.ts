@@ -1,4 +1,4 @@
-// 种子数据：开发环境的演示分类与商品（幂等，可重复执行）
+// 种子数据：开发环境的演示分类/商品/订单/评价（幂等，可重复执行）
 // 运行：npm run db:seed（需先完成 db:migrate）
 
 import { PrismaClient, ProductStatus } from "@prisma/client";
@@ -123,9 +123,40 @@ const products: SeedProduct[] = [
   },
 ];
 
+// 商品占位图：渐变底 + emoji 的 SVG data URL（多角度多配色，供相册演示）
+function productImage(emoji: string, from: string, to: string, decor: string): string {
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400">` +
+    `<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">` +
+    `<stop offset="0" stop-color="${from}"/><stop offset="1" stop-color="${to}"/>` +
+    `</linearGradient></defs>` +
+    `<rect width="400" height="400" fill="url(#g)"/>` +
+    `<circle cx="330" cy="70" r="90" fill="#ffffff" opacity="0.12"/>` +
+    `<circle cx="60" cy="340" r="60" fill="#ffffff" opacity="0.1"/>` +
+    `<text x="200" y="245" font-size="150" text-anchor="middle">${emoji}</text>` +
+    `<text x="200" y="330" font-size="22" text-anchor="middle" fill="#ffffff" opacity="0.85" font-family="sans-serif">${decor}</text>` +
+    `</svg>`;
+  return "data:image/svg+xml;utf8," + encodeURIComponent(svg);
+}
+
+const GRADIENTS: [string, string][] = [
+  ["#1d3557", "#457b9d"],
+  ["#e63946", "#f4772e"],
+  ["#2a9d8f", "#89c2a9"],
+  ["#7b2cbf", "#c77dff"],
+];
+
+function buildImages(emoji: string, index: number): string[] {
+  const decors = ["官方正品", "品质保障", "旗舰好物"];
+  return decors.map((decor, i) => {
+    const [from, to] = GRADIENTS[(index + i) % GRADIENTS.length];
+    return productImage(emoji, from, to, decor);
+  });
+}
+
 async function main() {
   // 演示账号：demo@example.com / demo123456（幂等，密码变更不覆盖）
-  await prisma.user.upsert({
+  const demoUser = await prisma.user.upsert({
     where: { email: "demo@example.com" },
     update: {},
     create: {
@@ -146,16 +177,25 @@ async function main() {
     categoryMap.set(category.slug, record.id);
   }
 
-  // 商品按名称幂等写入（存在则跳过，避免重复堆积）
+  // 商品按名称幂等写入（已存在但缺多图的补齐图片，不重复堆积）
   let created = 0;
+  let updatedImages = 0;
+  const productIdByName = new Map<string, number>();
   for (const product of products) {
-    const exists = await prisma.product.findFirst({
+    const categoryIcon = categories.find((c) => c.slug === product.categorySlug)?.icon ?? "🛍️";
+    const images = JSON.stringify(buildImages(categoryIcon, created + products.indexOf(product)));
+    const existing = await prisma.product.findFirst({
       where: { name: product.name },
-      select: { id: true },
     });
-    if (exists) continue;
-
-    await prisma.product.create({
+    if (existing) {
+      productIdByName.set(product.name, existing.id);
+      if (!existing.images) {
+        await prisma.product.update({ where: { id: existing.id }, data: { images } });
+        updatedImages += 1;
+      }
+      continue;
+    }
+    const record = await prisma.product.create({
       data: {
         name: product.name,
         description: product.description,
@@ -164,13 +204,101 @@ async function main() {
         sales: product.sales,
         status: ProductStatus.ON_SALE,
         categoryId: categoryMap.get(product.categorySlug),
+        images,
       },
     });
+    productIdByName.set(product.name, record.id);
     created += 1;
   }
 
+  // 演示订单 1：已完成（带评价）——幂等按 orderNo
+  const completedItems = [
+    { name: "降噪无线蓝牙耳机 AirPro 3", price: 699, quantity: 1 },
+    { name: "氨基酸保湿洁面乳 150ml", price: 79, quantity: 2 },
+  ];
+  const completedOrder = await prisma.order.upsert({
+    where: { orderNo: "DEMO202609010001" },
+    update: {},
+    create: {
+      orderNo: "DEMO202609010001",
+      userId: demoUser.id,
+      status: "COMPLETED",
+      totalAmount: completedItems.reduce((s, i) => s + i.price * i.quantity, 0),
+      recipientName: "演示用户",
+      recipientPhone: "13800138000",
+      shippingAddress: "浙江省杭州市西湖区文三路 100 号",
+      items: {
+        create: completedItems.map((item) => ({
+          productId: productIdByName.get(item.name)!,
+          name: item.name,
+          price: item.price,
+          quantity: item.quantity,
+        })),
+      },
+    },
+    include: { items: true },
+  });
+
+  // 已完成订单的演示评价（一单一商品一条，唯一约束幂等）
+  const reviewSpecs = [
+    {
+      productName: "降噪无线蓝牙耳机 AirPro 3",
+      rating: 5,
+      content: "降噪效果一流，戴着一下午耳朵也不累，音质超出预期！",
+    },
+    {
+      productName: "氨基酸保湿洁面乳 150ml",
+      rating: 4,
+      content: "洗完不紧绷，敏感肌友好，就是泡沫略少一点。",
+    },
+  ];
+  for (const spec of reviewSpecs) {
+    const item = completedOrder.items.find((i) => i.name === spec.productName);
+    if (!item) continue;
+    const exists = await prisma.review.findUnique({
+      where: { orderId_productId: { orderId: completedOrder.id, productId: item.productId } },
+    });
+    if (!exists) {
+      await prisma.review.create({
+        data: {
+          orderId: completedOrder.id,
+          userId: demoUser.id,
+          productId: item.productId,
+          rating: spec.rating,
+          content: spec.content,
+        },
+      });
+    }
+  }
+
+  // 演示订单 2：已发货（待评价，给「待评价」入口留演示数据）
+  const shippedProduct = "机械键盘 87 键 红轴";
+  await prisma.order.upsert({
+    where: { orderNo: "DEMO202609010002" },
+    update: {},
+    create: {
+      orderNo: "DEMO202609010002",
+      userId: demoUser.id,
+      status: "SHIPPED",
+      totalAmount: 329,
+      recipientName: "演示用户",
+      recipientPhone: "13800138000",
+      shippingAddress: "浙江省杭州市西湖区文三路 100 号",
+      items: {
+        create: [
+          {
+            productId: productIdByName.get(shippedProduct)!,
+            name: shippedProduct,
+            price: 329,
+            quantity: 1,
+          },
+        ],
+      },
+    },
+  });
+
   console.log(
-    `种子数据完成：分类 ${categories.length} 个，新写入商品 ${created} 个（共 ${products.length} 条演示数据）`,
+    `种子数据完成：分类 ${categories.length} 个，新写入商品 ${created} 个、补齐图片 ${updatedImages} 个（共 ${products.length} 条），演示订单 2 笔 + 评价 2 条`,
   );
 }
 
