@@ -38,6 +38,7 @@ const STATUS_LABEL: Record<string, string> = {
 export function ProductManager() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [keyword, setKeyword] = useState("");
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -45,6 +46,16 @@ export function ProductManager() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  // 查询：名称 / 店铺（客户端过滤，数据已全量加载）
+  const filtered = products.filter((product) => {
+    const text = keyword.trim().toLowerCase();
+    if (!text) return true;
+    return (
+      product.name.toLowerCase().includes(text) ||
+      (product.seller?.nickname ?? "").toLowerCase().includes(text)
+    );
+  });
 
   const loadProducts = useCallback(async () => {
     const res = await fetch("/api/merchant/products");
@@ -140,7 +151,9 @@ export function ProductManager() {
   return (
     <section className="overflow-hidden rounded-2xl border border-black/10 dark:border-white/15">
       <div className="flex items-center justify-between bg-mist px-6 py-3 dark:bg-white/5">
-        <h2 className="text-sm font-semibold">商品管理（{products.length}）</h2>
+        <h2 className="text-sm font-semibold">
+          商品管理（{filtered.length}/{products.length}）
+        </h2>
         <button
           type="button"
           onClick={() => (showForm ? setShowForm(false) : startCreate())}
@@ -148,6 +161,17 @@ export function ProductManager() {
         >
           {showForm ? "收起" : "+ 新增商品"}
         </button>
+      </div>
+
+      {/* 查询栏 */}
+      <div className="border-b border-black/5 px-6 py-3 dark:border-white/10">
+        <input
+          type="search"
+          value={keyword}
+          onChange={(e) => setKeyword(e.target.value)}
+          placeholder="🔍 搜索商品名称或店铺"
+          className="w-full rounded-full border border-black/15 px-4 py-2 text-sm outline-none focus:border-promo dark:border-white/20"
+        />
       </div>
 
       {showForm && (
@@ -232,9 +256,11 @@ export function ProductManager() {
         <p className="p-5 text-sm opacity-50">加载商品…</p>
       ) : products.length === 0 ? (
         <p className="p-5 text-sm opacity-50">还没有商品，点上方「新增商品」创建</p>
+      ) : filtered.length === 0 ? (
+        <p className="p-5 text-sm opacity-50">没有匹配「{keyword}」的商品</p>
       ) : (
         <ul className="divide-y divide-black/5 text-sm dark:divide-white/10">
-          {products.map((product) => (
+          {filtered.map((product) => (
             <li key={product.id} className="flex items-center gap-4 px-6 py-3.5">
               <div className="min-w-0 flex-1">
                 <p className="truncate font-medium">{product.name}</p>

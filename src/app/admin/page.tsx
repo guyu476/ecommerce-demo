@@ -39,6 +39,21 @@ export default function AdminPage() {
     if (isApiSuccess(result)) setUsers(result.data);
   }, []);
 
+  const [userKeyword, setUserKeyword] = useState("");
+  const [userRoleFilter, setUserRoleFilter] = useState("all");
+
+  // 查询：昵称 / 邮箱 / 手机号 + 角色筛选
+  const filteredUsers = users.filter((user) => {
+    if (userRoleFilter !== "all" && user.role !== userRoleFilter) return false;
+    const text = userKeyword.trim().toLowerCase();
+    if (!text) return true;
+    return (
+      user.nickname.toLowerCase().includes(text) ||
+      (user.email ?? "").toLowerCase().includes(text) ||
+      (user.phone ?? "").includes(text)
+    );
+  });
+
   const loadMe = useCallback(async () => {
     const res = await fetch("/api/auth/me");
     const result = (await res.json()) as ApiResponse<Me>;
@@ -140,44 +155,70 @@ export default function AdminPage() {
       {tab === "users" && (
         <section className="overflow-hidden rounded-2xl border border-black/10 dark:border-white/15">
           <div className="bg-mist px-6 py-3 text-sm font-semibold dark:bg-white/5">
-            用户（{users.length}）
+            用户（{filteredUsers.length}/{users.length}）
           </div>
-          <ul className="divide-y divide-black/5 text-sm dark:divide-white/10">
-            {users.map((user) => (
-              <li key={user.id} className="flex items-center gap-4 px-6 py-3.5">
-                <div className="min-w-0 flex-1">
-                  <p className="font-medium">
-                    {user.nickname}
-                    {user.role === "ADMIN" && (
-                      <span className="ml-2 rounded bg-ink px-1.5 py-0.5 text-[10px] text-white">
-                        管理员
-                      </span>
-                    )}
-                    {user.role === "MERCHANT" && (
-                      <span className="ml-2 rounded bg-market px-1.5 py-0.5 text-[10px] text-ink">
-                        商家
-                      </span>
-                    )}
-                  </p>
-                  <p className="mt-0.5 truncate text-xs opacity-50">
-                    {user.email ?? user.phone ?? "—"}
-                  </p>
-                </div>
-                <select
-                  value={user.role}
-                  disabled={busyUserId === user.id}
-                  onChange={(e) => changeRole(user.id, e.target.value)}
-                  className="rounded-lg border border-black/15 px-3 py-1.5 text-xs dark:border-white/20"
-                >
-                  {Object.entries(ROLE_LABEL).map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-              </li>
-            ))}
-          </ul>
+
+          {/* 查询栏 */}
+          <div className="flex flex-wrap gap-2 border-b border-black/5 px-6 py-3 dark:border-white/10">
+            <input
+              type="search"
+              value={userKeyword}
+              onChange={(e) => setUserKeyword(e.target.value)}
+              placeholder="🔍 搜索昵称 / 邮箱 / 手机号"
+              className="min-w-0 flex-1 rounded-full border border-black/15 px-4 py-2 text-sm outline-none focus:border-promo dark:border-white/20"
+            />
+            <select
+              value={userRoleFilter}
+              onChange={(e) => setUserRoleFilter(e.target.value)}
+              className="rounded-full border border-black/15 px-4 py-2 text-sm dark:border-white/20"
+            >
+              <option value="all">全部角色</option>
+              <option value="USER">用户</option>
+              <option value="MERCHANT">商家</option>
+              <option value="ADMIN">管理员</option>
+            </select>
+          </div>
+
+          {filteredUsers.length === 0 ? (
+            <p className="p-5 text-sm opacity-50">没有匹配的用户</p>
+          ) : (
+            <ul className="divide-y divide-black/5 text-sm dark:divide-white/10">
+              {filteredUsers.map((user) => (
+                <li key={user.id} className="flex items-center gap-4 px-6 py-3.5">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium">
+                      {user.nickname}
+                      {user.role === "ADMIN" && (
+                        <span className="ml-2 rounded bg-ink px-1.5 py-0.5 text-[10px] text-white">
+                          管理员
+                        </span>
+                      )}
+                      {user.role === "MERCHANT" && (
+                        <span className="ml-2 rounded bg-market px-1.5 py-0.5 text-[10px] text-ink">
+                          商家
+                        </span>
+                      )}
+                    </p>
+                    <p className="mt-0.5 truncate text-xs opacity-50">
+                      {user.email ?? user.phone ?? "—"}
+                    </p>
+                  </div>
+                  <select
+                    value={user.role}
+                    disabled={busyUserId === user.id}
+                    onChange={(e) => changeRole(user.id, e.target.value)}
+                    className="rounded-lg border border-black/15 px-3 py-1.5 text-xs dark:border-white/20"
+                  >
+                    {Object.entries(ROLE_LABEL).map(([value, label]) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
       )}
     </main>

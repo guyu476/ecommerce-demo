@@ -90,13 +90,24 @@ export default function OrdersPage() {
   const [status, setStatus] = useState<"loading" | "guest" | "ready">("loading");
   const [orders, setOrders] = useState<Order[]>([]);
   const [busyId, setBusyId] = useState<number | null>(null);
+  const [keyword, setKeyword] = useState("");
   const [reviewTarget, setReviewTarget] = useState<{ orderId: number; productId: number } | null>(
     null,
   );
   const [reviewForm, setReviewForm] = useState({ rating: 5, content: "" });
 
+  // 查询：单号 / 商品名（客户端过滤，已加载本页订单）
+  const filteredOrders = orders.filter((order) => {
+    const text = keyword.trim().toLowerCase();
+    if (!text) return true;
+    return (
+      order.orderNo.toLowerCase().includes(text) ||
+      order.items.some((item) => item.name.toLowerCase().includes(text))
+    );
+  });
+
   const loadOrders = useCallback(async (activeTab: Tab) => {
-    const res = await fetch(`/api/orders?page=1&pageSize=20${tabQuery(activeTab)}`);
+    const res = await fetch(`/api/orders?page=1&pageSize=50${tabQuery(activeTab)}`);
     const result = (await res.json()) as ApiResponse<{ list: Order[] }>;
     if (result.code === 40101) {
       setStatus("guest");
@@ -204,6 +215,17 @@ export default function OrdersPage() {
         ))}
       </div>
 
+      {/* 查询栏 */}
+      <div className="mb-4">
+        <input
+          type="search"
+          value={keyword}
+          onChange={(e) => setKeyword(e.target.value)}
+          placeholder="🔍 搜索单号或商品名"
+          className="w-full rounded-full border border-black/15 px-5 py-2.5 text-sm outline-none focus:border-promo dark:border-white/20"
+        />
+      </div>
+
       {orders.length === 0 ? (
         <div className="rounded-xl border border-dashed border-black/15 py-16 text-center text-sm dark:border-white/20">
           <p className="mb-2 text-4xl">🧾</p>
@@ -221,9 +243,13 @@ export default function OrdersPage() {
             去逛逛
           </Link>
         </div>
+      ) : filteredOrders.length === 0 ? (
+        <p className="rounded-xl border border-dashed border-black/15 py-12 text-center text-sm opacity-60 dark:border-white/20">
+          没有匹配「{keyword}」的订单
+        </p>
       ) : (
         <ul className="space-y-6">
-          {orders.map((order) => {
+          {filteredOrders.map((order) => {
             const pending = unreviewedItems(order);
             return (
               <li
