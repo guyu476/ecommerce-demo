@@ -99,7 +99,7 @@ model Product {
   description String?       @db.Text
   price       Decimal       @db.Decimal(10, 2)
   image       String?       @db.VarChar(500)
-  images      String?       @db.Text
+  images      String?       @db.MediumText
   stock       Int           @default(0)
   sales       Int           @default(0)
   status      ProductStatus @default(DRAFT)

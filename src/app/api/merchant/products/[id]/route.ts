@@ -16,6 +16,18 @@ const updateBodySchema = z.object({
   stock: z.coerce.number().int().min(0).optional(),
   categoryId: z.coerce.number().int().positive().optional(),
   status: z.enum(["DRAFT", "ON_SALE", "OFF_SALE"]).optional(),
+  // 商品图片：整体替换（客户端压缩后的 data URL 数组）
+  images: z
+    .array(
+      z
+        .string()
+        .max(400_000, "单张图片过大")
+        .refine((v) => v.startsWith("data:image/"), {
+          message: "仅支持图片 data URL",
+        }),
+    )
+    .max(6, "最多 6 张图片")
+    .optional(),
 });
 
 async function getOwnedProduct(productId: number, user: { id: number; role: string }) {
@@ -35,11 +47,15 @@ export async function PATCH(request: NextRequest, context: Context) {
     const user = await requireRole("MERCHANT", "ADMIN");
     const { id } = await context.params;
     await getOwnedProduct(idSchema.parse(id), user);
-    const body = updateBodySchema.parse(await request.json());
+    // images 数组单独处理（入库前序列化为 JSON 字符串）
+    const { images, ...rest } = updateBodySchema.parse(await request.json());
 
     const product = await prisma.product.update({
       where: { id: idSchema.parse(id) },
-      data: body,
+      data: {
+        ...rest,
+        ...(images ? { images: JSON.stringify(images) } : {}),
+      },
       include: { category: true },
     });
     return ok(product, "已更新");

@@ -13,6 +13,18 @@ const productBodySchema = z.object({
   stock: z.coerce.number().int().min(0).default(0),
   categoryId: z.coerce.number().int().positive(),
   status: z.enum(["DRAFT", "ON_SALE", "OFF_SALE"]).default("DRAFT"),
+  // 商品图片：客户端压缩后的 data URL 数组（最多 6 张，每张 ≤ 400KB）
+  images: z
+    .array(
+      z
+        .string()
+        .max(400_000, "单张图片过大")
+        .refine((v) => v.startsWith("data:image/") || v.startsWith("data:image"), {
+          message: "仅支持图片 data URL",
+        }),
+    )
+    .max(6, "最多 6 张图片")
+    .optional(),
 });
 
 // GET /api/merchant/products 我的商品列表（商家看自己的，管理员看全部）
@@ -45,7 +57,11 @@ export async function POST(request: NextRequest) {
     }
 
     const product = await prisma.product.create({
-      data: { ...body, sellerId: user.role === "MERCHANT" ? user.id : null },
+      data: {
+        ...body,
+        images: body.images ? JSON.stringify(body.images) : undefined,
+        sellerId: user.role === "MERCHANT" ? user.id : null,
+      },
       include: { category: true },
     });
 

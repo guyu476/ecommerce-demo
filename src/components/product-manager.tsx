@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { formatPrice } from "@/lib/format";
 import type { ApiResponse } from "@/types/api";
 import { isApiSuccess } from "@/types/api";
@@ -13,6 +13,7 @@ type Product = {
   sales: number;
   status: string;
   categoryId: number;
+  images: string | null;
   seller?: { nickname: string } | null;
   category: { id: number; name: string; icon: string | null } | null;
 };
@@ -34,6 +35,47 @@ const STATUS_LABEL: Record<string, string> = {
   OFF_SALE: "已下架",
 };
 
+/** 解析商品 images JSON */
+function parseImages(images: string | null): string[] {
+  if (!images) return [];
+  try {
+    const parsed = JSON.parse(images);
+    return Array.isArray(parsed) ? parsed.filter((x) => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+/** 图片压缩：等比缩放到 600px 以内方图（cover 裁剪），JPEG data URL */
+function compressImage(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const size = 600;
+        const canvas = document.createElement("canvas");
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          reject(new Error("canvas 不可用"));
+          return;
+        }
+        const scale = Math.max(size / img.width, size / img.height);
+        const w = img.width * scale;
+        const h = img.height * scale;
+        ctx.drawImage(img, (size - w) / 2, (size - h) / 2, w, h);
+        resolve(canvas.toDataURL("image/jpeg", 0.78));
+      };
+      img.onerror = () => reject(new Error("图片读取失败"));
+      img.src = String(reader.result);
+    };
+    reader.onerror = () => reject(new Error("文件读取失败"));
+    reader.readAsDataURL(file);
+  });
+}
+
 // 商品管理器：商家（自己的）/ 管理员（全部）共用，走 /api/merchant/products
 export function ProductManager() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -43,9 +85,11 @@ export function ProductManager() {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [formImages, setFormImages] = useState<string[]>([]);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 查询：名称 / 店铺（客户端过滤，数据已全量加载）
   const filtered = products.filter((product) => {
@@ -79,6 +123,7 @@ export function ProductManager() {
   function startCreate() {
     setEditingId(null);
     setForm({ ...EMPTY_FORM, categoryId: String(categories[0]?.id ?? "") });
+    setFormImages([]);
     setError(null);
     setFieldErrors({});
     setShowForm(true);
@@ -94,9 +139,35 @@ export function ProductManager() {
       description: "",
       status: product.status,
     });
+    setFormImages(parseImages(product.images));
     setError(null);
     setFieldErrors({});
     setShowForm(true);
+  }
+
+  // 图片上传：逐张压缩，最多 6 张
+  async function handleImageFiles(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = [...(e.target.files ?? [])];
+    e.target.value = "";
+    if (files.length === 0) return;
+    if (formImages.length + files.length > 6) {
+      setError("最多 6 张图片");
+      return;
+    }
+    setBusy(true);
+    try {
+      const compressed: string[] = [];
+      for (const file of files) {
+        if (!file.type.startsWith("image/")) continue;
+        compressed.push(await compressImage(file));
+      }
+      setFormImages((prev) => [...prev, ...compressed]);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "图片处理失败");
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function submitForm(e: React.FormEvent) {
@@ -109,7 +180,7 @@ export function ProductManager() {
       const res = await fetch(url, {
         method: editingId ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, images: formImages }),
       });
       const result = (await res.json()) as ApiResponse;
       if (isApiSuccess(result)) {
@@ -225,6 +296,60 @@ export function ProductManager() {
             onChange={(e) => setForm({ ...form, description: e.target.value })}
             className={inputClass}
           />
+
+          {/* 商品图片：上传（自动压缩为 600px 方图）+ 缩略图管理 */}
+          <div>
+            <p className="mb-2 text-sm opacity-70">
+              商品图片（{formImages.length}/6，第一张为主图）
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              {formImages.map((image, i) => (
+                <div
+                  key={i}
+                  className="group relative h-20 w-20 overflow-hidden rounded-lg border border-black/10 dark:border-white/20"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={image} alt={`商品图 ${i + 1}`} className="h-full w-full object-cover" />
+                  {i === 0 && (
+                    <span className="absolute left-0 top-0 bg-ink px-1 py-0.5 text-[9px] text-white">
+                      主图
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    aria-label={`删除第 ${i + 1} 张图`}
+                    onClick={() => setFormImages((prev) => prev.filter((_, idx) => idx !== i))}
+                    className="absolute right-0 top-0 flex h-5 w-5 items-center justify-center bg-black/55 text-[10px] text-white"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+              {formImages.length < 6 && (
+                <>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    onChange={handleImageFiles}
+                  />
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex h-20 w-20 items-center justify-center rounded-lg border border-dashed border-black/25 text-2xl opacity-60 transition-colors hover:border-promo hover:text-promo hover:opacity-100 dark:border-white/25"
+                    aria-label="上传商品图片"
+                  >
+                    +
+                  </button>
+                </>
+              )}
+            </div>
+            <p className="mt-1 text-xs opacity-45">不上传则使用系统默认图</p>
+          </div>
+
           <select
             value={form.status}
             onChange={(e) => setForm({ ...form, status: e.target.value })}
