@@ -150,38 +150,17 @@ export function OrderManager({ role }: { role: "MERCHANT" | "ADMIN" }) {
                 <span className="opacity-60">
                   {order.recipientName} · {order.recipientPhone} · {order.shippingAddress}
                 </span>
-                <div className="flex gap-2">
-                  {order.status === "PAID" && (
-                    <button
-                      type="button"
-                      disabled={busyId === order.id}
-                      onClick={() => transition(order.id, "ship")}
-                      className="rounded-full bg-ink px-5 py-1.5 font-medium text-white disabled:opacity-40"
-                    >
-                      {busyId === order.id ? "处理中…" : "发货"}
-                    </button>
-                  )}
-                  {role === "ADMIN" && order.status === "PENDING_PAYMENT" && (
-                    <button
-                      type="button"
-                      disabled={busyId === order.id}
-                      onClick={() => transition(order.id, "pay")}
-                      className="rounded-full border border-black/15 px-4 py-1.5 disabled:opacity-40 dark:border-white/20"
-                    >
-                      标记已付款
-                    </button>
-                  )}
-                  {role === "ADMIN" && order.status === "SHIPPED" && (
-                    <button
-                      type="button"
-                      disabled={busyId === order.id}
-                      onClick={() => transition(order.id, "confirm")}
-                      className="rounded-full border border-black/15 px-4 py-1.5 disabled:opacity-40 dark:border-white/20"
-                    >
-                      确认收货
-                    </button>
-                  )}
-                </div>
+                {/* 发货仅商家可操作；管理员只读监督 */}
+                {role === "MERCHANT" && order.status === "PAID" && (
+                  <button
+                    type="button"
+                    disabled={busyId === order.id}
+                    onClick={() => transition(order.id, "ship")}
+                    className="rounded-full bg-ink px-5 py-1.5 font-medium text-white disabled:opacity-40"
+                  >
+                    {busyId === order.id ? "处理中…" : "发货"}
+                  </button>
+                )}
               </div>
             </li>
           ))}

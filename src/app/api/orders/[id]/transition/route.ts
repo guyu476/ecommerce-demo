@@ -7,7 +7,7 @@ import { prisma } from "@/lib/prisma";
 
 // POST /api/orders/[id]/transition 订单状态流转
 // 状态机：PENDING_PAYMENT --pay--> PAID --ship--> SHIPPED --confirm--> COMPLETED
-// 权限：买家本人可全部操作；商家可对含自己商品的订单发货；管理员任意
+// 权限：买家本人可全部操作；商家可对含自己商品的订单发货；管理员只读监督，不参与流转
 type Context = RouteContext<"/api/orders/[id]/transition">;
 
 const idSchema = z.coerce.number().int().positive();
@@ -39,11 +39,12 @@ export async function POST(request: NextRequest, context: Context) {
     }
 
     const isOwner = order.userId === user.id;
-    const isAdmin = user.role === "ADMIN";
-    const containsMine =
-      user.role === "MERCHANT" && order.items.some((item) => item.product.sellerId === user.id);
+    const isMerchantShip =
+      user.role === "MERCHANT" &&
+      action === "ship" &&
+      order.items.some((item) => item.product.sellerId === user.id);
 
-    if (!isOwner && !isAdmin && !(containsMine && action === "ship")) {
+    if (!isOwner && !isMerchantShip) {
       throw new ApiError("订单不存在", 40406, 404);
     }
 
