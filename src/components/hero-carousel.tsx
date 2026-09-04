@@ -9,8 +9,7 @@ export interface CarouselSlide {
   id: number;
   name: string;
   price: number;
-  icon: string;
-  image: string; // 商品第一张上传图；空则显示 icon 装饰
+  image: string; // 商品第一张上传图；未上传则显示浅黑占位
 }
 
 // 层叠位置 → 卡片变换（内联样式，避免动态类名被 JIT 漏掉）
@@ -83,17 +82,11 @@ export function HeroCarousel({ slides }: { slides: CarouselSlide[] }) {
                   立即查看
                 </Link>
               </div>
-              <div
-                className={`shrink-0 overflow-hidden rounded-xl transition-transform duration-500 ${
-                  active ? "scale-100" : "scale-90"
-                } ${slide.image ? "h-40 w-40 sm:h-48 sm:w-48" : "text-[110px] sm:text-[130px]"}`}
-              >
+              <div className="h-40 w-40 shrink-0 overflow-hidden rounded-xl bg-zinc-800 sm:h-48 sm:w-48">
                 {slide.image ? (
                   /* eslint-disable-next-line @next/next/no-img-element */
                   <img src={slide.image} alt={slide.name} className="h-full w-full object-cover" />
-                ) : (
-                  slide.icon
-                )}
+                ) : null}
               </div>
             </article>
           );
