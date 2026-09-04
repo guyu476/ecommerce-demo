@@ -13,14 +13,14 @@ const productBodySchema = z.object({
   stock: z.coerce.number().int().min(0).default(0),
   categoryId: z.coerce.number().int().positive(),
   status: z.enum(["DRAFT", "ON_SALE", "OFF_SALE"]).default("DRAFT"),
-  // 商品图片：客户端压缩后的 data URL 数组（最多 6 张，每张 ≤ 400KB）
+  // 商品图片：客户端压缩的 data URL 或本站静态路径（/products/...），最多 6 张
   images: z
     .array(
       z
         .string()
         .max(400_000, "单张图片过大")
-        .refine((v) => v.startsWith("data:image/") || v.startsWith("data:image"), {
-          message: "仅支持图片 data URL",
+        .refine((v) => v.startsWith("data:image/") || v.startsWith("/"), {
+          message: "仅支持图片 data URL 或本站图片路径",
         }),
     )
     .max(6, "最多 6 张图片")

@@ -13,7 +13,7 @@ const MAP: Record<string, string> = {
   "变频空调 大1.5匹 新一级能效": "/products/p7.jpg",
   "扫地机器人 扫拖一体": "/products/p8.jpg",
   "纯棉基础款圆领 T 恤": "/products/p9.jpg",
-  "轻商务休闲双肩包": "/products/p10.jpg",
+  轻商务休闲双肩包: "/products/p10.jpg",
   "氨基酸保湿洁面乳 150ml": "/products/p11.jpg",
   "阿克苏冰糖心苹果 5kg 装": "/products/p12.jpg",
 };

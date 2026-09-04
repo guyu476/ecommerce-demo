@@ -77,12 +77,13 @@ function compressImage(file: File): Promise<string> {
 }
 
 // 商品管理器：商家（自己的）/ 管理员（全部）共用，走 /api/merchant/products
+// 新增表单在顶部；点「编辑」在该商品行下方展开表单，保存/收起即关闭
 export function ProductManager() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [keyword, setKeyword] = useState("");
   const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
+  const [showCreate, setShowCreate] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [formImages, setFormImages] = useState<string[]>([]);
@@ -120,16 +121,27 @@ export function ProductManager() {
     })();
   }, [loadProducts]);
 
-  function startCreate() {
+  function closeForms() {
+    setShowCreate(false);
     setEditingId(null);
+  }
+
+  function startCreate() {
+    closeForms();
     setForm({ ...EMPTY_FORM, categoryId: String(categories[0]?.id ?? "") });
     setFormImages([]);
     setError(null);
     setFieldErrors({});
-    setShowForm(true);
+    setShowCreate(true);
   }
 
   function startEdit(product: Product) {
+    // 再点一次同一行的「编辑」= 收起
+    if (editingId === product.id) {
+      setEditingId(null);
+      return;
+    }
+    setShowCreate(false);
     setEditingId(product.id);
     setForm({
       name: product.name,
@@ -142,7 +154,6 @@ export function ProductManager() {
     setFormImages(parseImages(product.images));
     setError(null);
     setFieldErrors({});
-    setShowForm(true);
   }
 
   // 图片上传：逐张压缩，最多 6 张
@@ -184,7 +195,7 @@ export function ProductManager() {
       });
       const result = (await res.json()) as ApiResponse;
       if (isApiSuccess(result)) {
-        setShowForm(false);
+        closeForms();
         await loadProducts();
       } else {
         setError(result.message);
@@ -219,6 +230,137 @@ export function ProductManager() {
   const inputClass =
     "w-full rounded-lg border border-black/15 px-3 py-2 text-sm dark:border-white/20";
 
+  // 商品表单（新增/编辑共用）：新增时渲染在顶部，编辑时渲染在对应行下方
+  const formJsx = (
+    <form
+      onSubmit={submitForm}
+      className="space-y-3 border-black/5 bg-mist/60 p-5 dark:border-white/10 dark:bg-white/5"
+    >
+      <input
+        required
+        placeholder="商品名称"
+        value={form.name}
+        onChange={(e) => setForm({ ...form, name: e.target.value })}
+        className={inputClass}
+      />
+      <div className="grid gap-3 sm:grid-cols-3">
+        <input
+          required
+          type="number"
+          min="0"
+          step="0.01"
+          placeholder="价格"
+          value={form.price}
+          onChange={(e) => setForm({ ...form, price: e.target.value })}
+          className={inputClass}
+        />
+        <input
+          required
+          type="number"
+          min="0"
+          placeholder="库存"
+          value={form.stock}
+          onChange={(e) => setForm({ ...form, stock: e.target.value })}
+          className={inputClass}
+        />
+        <select
+          value={form.categoryId}
+          onChange={(e) => setForm({ ...form, categoryId: e.target.value })}
+          className={inputClass}
+        >
+          {categories.map((category) => (
+            <option key={category.id} value={category.id}>
+              {category.icon} {category.name}
+            </option>
+          ))}
+        </select>
+      </div>
+      <textarea
+        rows={2}
+        placeholder="商品描述（可选）"
+        value={form.description}
+        onChange={(e) => setForm({ ...form, description: e.target.value })}
+        className={inputClass}
+      />
+
+      {/* 商品图片：上传（自动压缩为 600px 方图）+ 缩略图管理 */}
+      <div>
+        <p className="mb-2 text-sm opacity-70">商品图片（{formImages.length}/6，第一张为主图）</p>
+        <div className="flex flex-wrap items-center gap-2">
+          {formImages.map((image, i) => (
+            <div
+              key={i}
+              className="group relative h-20 w-20 overflow-hidden rounded-lg border border-black/10 dark:border-white/20"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={image} alt={`商品图 ${i + 1}`} className="h-full w-full object-cover" />
+              {i === 0 && (
+                <span className="absolute left-0 top-0 bg-ink px-1 py-0.5 text-[9px] text-white">
+                  主图
+                </span>
+              )}
+              <button
+                type="button"
+                aria-label={`删除第 ${i + 1} 张图`}
+                onClick={() => setFormImages((prev) => prev.filter((_, idx) => idx !== i))}
+                className="absolute right-0 top-0 flex h-5 w-5 items-center justify-center bg-black/55 text-[10px] text-white"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+          {formImages.length < 6 && (
+            <>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={handleImageFiles}
+              />
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => fileInputRef.current?.click()}
+                className="flex h-20 w-20 items-center justify-center rounded-lg border border-dashed border-black/25 text-2xl opacity-60 transition-colors hover:border-promo hover:text-promo hover:opacity-100 dark:border-white/25"
+                aria-label="上传商品图片"
+              >
+                +
+              </button>
+            </>
+          )}
+        </div>
+        <p className="mt-1 text-xs opacity-45">不上传则使用系统默认图</p>
+      </div>
+
+      <select
+        value={form.status}
+        onChange={(e) => setForm({ ...form, status: e.target.value })}
+        className={inputClass}
+      >
+        <option value="ON_SALE">立即上架</option>
+        <option value="DRAFT">存为草稿</option>
+        <option value="OFF_SALE">下架状态</option>
+      </select>
+
+      {error && <p className="text-sm text-red-500">{error}</p>}
+      {Object.entries(fieldErrors).map(([field, message]) => (
+        <p key={field} className="text-xs text-red-500">
+          {message}
+        </p>
+      ))}
+
+      <button
+        type="submit"
+        disabled={busy}
+        className="rounded-full bg-promo px-8 py-2 text-sm font-medium text-white disabled:opacity-40"
+      >
+        {editingId ? "保存修改" : "创建商品"}
+      </button>
+    </form>
+  );
+
   return (
     <section className="overflow-hidden rounded-2xl border border-black/10 dark:border-white/15">
       <div className="flex items-center justify-between bg-mist px-6 py-3 dark:bg-white/5">
@@ -227,10 +369,10 @@ export function ProductManager() {
         </h2>
         <button
           type="button"
-          onClick={() => (showForm ? setShowForm(false) : startCreate())}
+          onClick={() => (showCreate ? setShowCreate(false) : startCreate())}
           className="text-xs text-promo hover:underline"
         >
-          {showForm ? "收起" : "+ 新增商品"}
+          {showCreate ? "收起" : "+ 新增商品"}
         </button>
       </div>
 
@@ -245,137 +387,8 @@ export function ProductManager() {
         />
       </div>
 
-      {showForm && (
-        <form
-          onSubmit={submitForm}
-          className="space-y-3 border-b border-black/5 p-5 dark:border-white/10"
-        >
-          <input
-            required
-            placeholder="商品名称"
-            value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-            className={inputClass}
-          />
-          <div className="grid gap-3 sm:grid-cols-3">
-            <input
-              required
-              type="number"
-              min="0"
-              step="0.01"
-              placeholder="价格"
-              value={form.price}
-              onChange={(e) => setForm({ ...form, price: e.target.value })}
-              className={inputClass}
-            />
-            <input
-              required
-              type="number"
-              min="0"
-              placeholder="库存"
-              value={form.stock}
-              onChange={(e) => setForm({ ...form, stock: e.target.value })}
-              className={inputClass}
-            />
-            <select
-              value={form.categoryId}
-              onChange={(e) => setForm({ ...form, categoryId: e.target.value })}
-              className={inputClass}
-            >
-              {categories.map((category) => (
-                <option key={category.id} value={category.id}>
-                  {category.icon} {category.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <textarea
-            rows={2}
-            placeholder="商品描述（可选）"
-            value={form.description}
-            onChange={(e) => setForm({ ...form, description: e.target.value })}
-            className={inputClass}
-          />
-
-          {/* 商品图片：上传（自动压缩为 600px 方图）+ 缩略图管理 */}
-          <div>
-            <p className="mb-2 text-sm opacity-70">
-              商品图片（{formImages.length}/6，第一张为主图）
-            </p>
-            <div className="flex flex-wrap items-center gap-2">
-              {formImages.map((image, i) => (
-                <div
-                  key={i}
-                  className="group relative h-20 w-20 overflow-hidden rounded-lg border border-black/10 dark:border-white/20"
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={image} alt={`商品图 ${i + 1}`} className="h-full w-full object-cover" />
-                  {i === 0 && (
-                    <span className="absolute left-0 top-0 bg-ink px-1 py-0.5 text-[9px] text-white">
-                      主图
-                    </span>
-                  )}
-                  <button
-                    type="button"
-                    aria-label={`删除第 ${i + 1} 张图`}
-                    onClick={() => setFormImages((prev) => prev.filter((_, idx) => idx !== i))}
-                    className="absolute right-0 top-0 flex h-5 w-5 items-center justify-center bg-black/55 text-[10px] text-white"
-                  >
-                    ×
-                  </button>
-                </div>
-              ))}
-              {formImages.length < 6 && (
-                <>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    className="hidden"
-                    onChange={handleImageFiles}
-                  />
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={() => fileInputRef.current?.click()}
-                    className="flex h-20 w-20 items-center justify-center rounded-lg border border-dashed border-black/25 text-2xl opacity-60 transition-colors hover:border-promo hover:text-promo hover:opacity-100 dark:border-white/25"
-                    aria-label="上传商品图片"
-                  >
-                    +
-                  </button>
-                </>
-              )}
-            </div>
-            <p className="mt-1 text-xs opacity-45">不上传则使用系统默认图</p>
-          </div>
-
-          <select
-            value={form.status}
-            onChange={(e) => setForm({ ...form, status: e.target.value })}
-            className={inputClass}
-          >
-            <option value="ON_SALE">立即上架</option>
-            <option value="DRAFT">存为草稿</option>
-            <option value="OFF_SALE">下架状态</option>
-          </select>
-
-          {error && <p className="text-sm text-red-500">{error}</p>}
-          {Object.entries(fieldErrors).map(([field, message]) => (
-            <p key={field} className="text-xs text-red-500">
-              {message}
-            </p>
-          ))}
-
-          <button
-            type="submit"
-            disabled={busy}
-            className="rounded-full bg-promo px-8 py-2 text-sm font-medium text-white disabled:opacity-40"
-          >
-            {editingId ? "保存修改" : "创建商品"}
-          </button>
-        </form>
-      )}
+      {/* 新增商品：顶部表单 */}
+      {showCreate && <div className="border-b border-black/5 dark:border-white/10">{formJsx}</div>}
 
       {loading ? (
         <p className="p-5 text-sm opacity-50">加载商品…</p>
@@ -386,52 +399,63 @@ export function ProductManager() {
       ) : (
         <ul className="divide-y divide-black/5 text-sm dark:divide-white/10">
           {filtered.map((product) => (
-            <li key={product.id} className="flex items-center gap-4 px-6 py-3.5">
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-medium">{product.name}</p>
-                <p className="mt-0.5 text-xs opacity-50">
-                  {product.category?.icon} {product.category?.name}
-                  {product.seller && <span className="ml-2">· {product.seller.nickname}</span>}
-                  <span className="ml-2">· 库存 {product.stock}</span>
-                  <span className="ml-2">· 已售 {product.sales}</span>
-                </p>
+            <li key={product.id} className="flex flex-col">
+              <div className="flex items-center gap-4 px-6 py-3.5">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-medium">{product.name}</p>
+                  <p className="mt-0.5 text-xs opacity-50">
+                    {product.category?.icon} {product.category?.name}
+                    {product.seller && <span className="ml-2">· {product.seller.nickname}</span>}
+                    <span className="ml-2">· 库存 {product.stock}</span>
+                    <span className="ml-2">· 已售 {product.sales}</span>
+                  </p>
+                </div>
+                <span className="font-mono font-bold text-promo">{formatPrice(product.price)}</span>
+                <span
+                  className={`w-14 text-center text-xs ${
+                    product.status === "ON_SALE"
+                      ? "text-emerald-600"
+                      : product.status === "DRAFT"
+                        ? "opacity-40"
+                        : "opacity-60"
+                  }`}
+                >
+                  {STATUS_LABEL[product.status]}
+                </span>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => toggleStatus(product)}
+                  className="text-xs opacity-60 hover:text-promo hover:opacity-100"
+                >
+                  {product.status === "ON_SALE" ? "下架" : "上架"}
+                </button>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => startEdit(product)}
+                  className={`text-xs hover:opacity-100 ${
+                    editingId === product.id
+                      ? "font-semibold text-promo opacity-100"
+                      : "opacity-60 hover:text-promo"
+                  }`}
+                >
+                  {editingId === product.id ? "收起" : "编辑"}
+                </button>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => removeProduct(product.id)}
+                  className="text-xs opacity-60 hover:text-red-500 hover:opacity-100"
+                >
+                  删除
+                </button>
               </div>
-              <span className="font-mono font-bold text-promo">{formatPrice(product.price)}</span>
-              <span
-                className={`w-14 text-center text-xs ${
-                  product.status === "ON_SALE"
-                    ? "text-emerald-600"
-                    : product.status === "DRAFT"
-                      ? "opacity-40"
-                      : "opacity-60"
-                }`}
-              >
-                {STATUS_LABEL[product.status]}
-              </span>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => toggleStatus(product)}
-                className="text-xs opacity-60 hover:text-promo hover:opacity-100"
-              >
-                {product.status === "ON_SALE" ? "下架" : "上架"}
-              </button>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => startEdit(product)}
-                className="text-xs opacity-60 hover:text-promo hover:opacity-100"
-              >
-                编辑
-              </button>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => removeProduct(product.id)}
-                className="text-xs opacity-60 hover:text-red-500 hover:opacity-100"
-              >
-                删除
-              </button>
+
+              {/* 行内编辑表单：在对应商品行下方展开 */}
+              {editingId === product.id && (
+                <div className="border-t border-black/5 dark:border-white/10">{formJsx}</div>
+              )}
             </li>
           ))}
         </ul>
