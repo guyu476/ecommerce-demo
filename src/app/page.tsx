@@ -2,7 +2,7 @@ import Link from "next/link";
 import { DbSetupNotice } from "@/components/db-setup-notice";
 import { HeroCarousel } from "@/components/hero-carousel";
 import { ProductCard } from "@/components/product-card";
-import { getStorefrontData } from "@/lib/queries";
+import { getStorefrontData, parseProductImages } from "@/lib/queries";
 
 // 首页 = 商城门面：轮播 + 可点击分类筛选（优惠券票根） + 商品纸签墙
 // 商品数据需要每次请求时拉取最新，强制动态渲染
@@ -126,6 +126,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
             name: product.name,
             price: Number(product.price),
             icon: product.category?.icon ?? "🛍️",
+            image: parseProductImages(product.images)[0] ?? "",
           }))}
         />
       )}

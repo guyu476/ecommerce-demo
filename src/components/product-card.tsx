@@ -1,11 +1,9 @@
 import Link from "next/link";
 import { formatPrice, formatSales } from "@/lib/format";
+import { parseProductImages } from "@/lib/queries";
 import type { ProductWithCategory } from "@/lib/queries";
 
-// 商品卡片（市集纸签风）：
-// - rank 1-3 时显示销量排名角标（排序真实反映数据，符合「结构即信息」）
-// - 库存 <= 50 时盖「库存紧张」印章
-// - 相邻卡片微微旋转，像钉在板上的纸签；悬停回正
+// 商品卡片：主图 = 商家上传的第一张图；未上传时显示浅黑色占位
 export function ProductCard({
   product,
   rank,
@@ -15,6 +13,9 @@ export function ProductCard({
   rank?: number;
   tilt?: number;
 }) {
+  const images = parseProductImages(product.images);
+  const cover = images[0];
+
   return (
     <Link
       href={`/products/${product.id}`}
@@ -22,10 +23,15 @@ export function ProductCard({
       style={{ rotate: `${tilt}deg` }}
     >
       <div className="relative">
-        <div className="flex aspect-square items-center justify-center rounded-t-xl bg-mist text-6xl dark:bg-white/5">
-          <span className="transition-transform duration-300 group-hover:scale-110 group-hover:-rotate-6">
-            {product.category?.icon ?? "🛍️"}
-          </span>
+        <div className="aspect-square overflow-hidden rounded-t-xl bg-zinc-800">
+          {cover ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              src={cover}
+              alt={product.name}
+              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+            />
+          ) : null}
         </div>
 
         {rank != null && rank <= 3 && (

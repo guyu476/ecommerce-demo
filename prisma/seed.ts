@@ -123,37 +123,6 @@ const products: SeedProduct[] = [
   },
 ];
 
-// 商品占位图：渐变底 + emoji 的 SVG data URL（多角度多配色，供相册演示）
-function productImage(emoji: string, from: string, to: string, decor: string): string {
-  const svg =
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400">` +
-    `<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">` +
-    `<stop offset="0" stop-color="${from}"/><stop offset="1" stop-color="${to}"/>` +
-    `</linearGradient></defs>` +
-    `<rect width="400" height="400" fill="url(#g)"/>` +
-    `<circle cx="330" cy="70" r="90" fill="#ffffff" opacity="0.12"/>` +
-    `<circle cx="60" cy="340" r="60" fill="#ffffff" opacity="0.1"/>` +
-    `<text x="200" y="245" font-size="150" text-anchor="middle">${emoji}</text>` +
-    `<text x="200" y="330" font-size="22" text-anchor="middle" fill="#ffffff" opacity="0.85" font-family="sans-serif">${decor}</text>` +
-    `</svg>`;
-  return "data:image/svg+xml;utf8," + encodeURIComponent(svg);
-}
-
-const GRADIENTS: [string, string][] = [
-  ["#1d3557", "#457b9d"],
-  ["#e63946", "#f4772e"],
-  ["#2a9d8f", "#89c2a9"],
-  ["#7b2cbf", "#c77dff"],
-];
-
-function buildImages(emoji: string, index: number): string[] {
-  const decors = ["官方正品", "品质保障", "旗舰好物"];
-  return decors.map((decor, i) => {
-    const [from, to] = GRADIENTS[(index + i) % GRADIENTS.length];
-    return productImage(emoji, from, to, decor);
-  });
-}
-
 async function main() {
   // 演示账号：demo@example.com / demo123456（幂等，密码变更不覆盖）
   const demoUser = await prisma.user.upsert({
@@ -201,14 +170,11 @@ async function main() {
     categoryMap.set(category.slug, record.id);
   }
 
-  // 商品按名称幂等写入（已存在但缺多图/缺商家的补齐，不重复堆积）
-  // 商家名下商品：手机数码 + 电脑办公两个分类（演示商家店铺）
+  // 商品按名称幂等写入（已存在但缺商家的补齐，不重复堆积）
+  // 商品图片一律由商家上传，种子数据不生成图片
   let created = 0;
-  let updatedImages = 0;
   const productIdByName = new Map<string, number>();
   for (const product of products) {
-    const categoryIcon = categories.find((c) => c.slug === product.categorySlug)?.icon ?? "🛍️";
-    const images = JSON.stringify(buildImages(categoryIcon, created + products.indexOf(product)));
     const sellerId =
       product.categorySlug === "digital" || product.categorySlug === "computer"
         ? merchantUser.id
@@ -218,12 +184,8 @@ async function main() {
     });
     if (existing) {
       productIdByName.set(product.name, existing.id);
-      const patch: Record<string, unknown> = {};
-      if (!existing.images) patch.images = images;
-      if (existing.sellerId === null && sellerId !== null) patch.sellerId = sellerId;
-      if (Object.keys(patch).length > 0) {
-        await prisma.product.update({ where: { id: existing.id }, data: patch });
-        updatedImages += 1;
+      if (existing.sellerId === null && sellerId !== null) {
+        await prisma.product.update({ where: { id: existing.id }, data: { sellerId } });
       }
       continue;
     }
@@ -237,7 +199,6 @@ async function main() {
         status: ProductStatus.ON_SALE,
         categoryId: categoryMap.get(product.categorySlug),
         sellerId,
-        images,
       },
     });
     productIdByName.set(product.name, record.id);
@@ -331,7 +292,7 @@ async function main() {
   });
 
   console.log(
-    `种子数据完成：分类 ${categories.length} 个，新写入商品 ${created} 个、补齐图片 ${updatedImages} 个（共 ${products.length} 条），演示订单 2 笔 + 评价 2 条`,
+    `种子数据完成：分类 ${categories.length} 个，新写入商品 ${created} 个（共 ${products.length} 条），演示订单 2 笔 + 评价 2 条`,
   );
 }
 

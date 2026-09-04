@@ -91,7 +91,7 @@ export default async function ProductDetailPage({ params }: Props) {
             aria-hidden
             className="washi absolute -top-3 left-1/2 h-7 w-28 -translate-x-1/2 rotate-2 rounded-sm"
           />
-          <ProductGallery images={images} fallbackIcon={product.category?.icon ?? "🛍️"} />
+          <ProductGallery images={images} />
         </div>
 
         <div className="flex flex-col gap-5">

@@ -3,23 +3,14 @@
 import { useState } from "react";
 import { createPortal } from "react-dom";
 
-// 商品多图相册：主图左右箭头切换 + 缩略图 + 点击放大（灯箱）；无图回退 emoji 占位
-export function ProductGallery({
-  images,
-  fallbackIcon,
-}: {
-  images: string[];
-  fallbackIcon: string;
-}) {
+// 商品多图相册：主图左右箭头切换 + 缩略图 + 点击放大（灯箱）
+// 图片数量 = 商家上传数量；未上传时显示浅黑色占位
+export function ProductGallery({ images }: { images: string[] }) {
   const [active, setActive] = useState(0);
   const [zoomed, setZoomed] = useState(false);
 
   if (images.length === 0) {
-    return (
-      <div className="flex aspect-square items-center justify-center rounded-md bg-mist text-[130px] dark:bg-white/5">
-        {fallbackIcon}
-      </div>
-    );
+    return <div className="aspect-square rounded-md bg-zinc-800" />;
   }
 
   const prev = () => setActive((i) => (i - 1 + images.length) % images.length);
@@ -30,7 +21,7 @@ export function ProductGallery({
 
   return (
     <div className="space-y-3">
-      <div className="relative aspect-square overflow-hidden rounded-md bg-white">
+      <div className="relative aspect-square overflow-hidden rounded-md bg-zinc-800">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={images[active]}
@@ -82,7 +73,7 @@ export function ProductGallery({
         </div>
       )}
 
-      {/* 灯箱：Portal 渲染到 body，避免被旋转/裁剪祖先限制定位 */}
+      {/* 灯箱：点击图片放大查看，点任意处关闭。Portal 渲染到 body，避免被旋转/裁剪祖先限制 */}
       {zoomed &&
         createPortal(
           <div
@@ -125,7 +116,7 @@ export function ProductGallery({
                     e.stopPropagation();
                     next();
                   }}
-                  className={arrowClass + " right-4 sm:right-10"}
+                  className={arrowClass + " right-4 sm:right-8"}
                 >
                   ›
                 </button>
