@@ -25,9 +25,12 @@ type ShopFavoriteView = {
   };
 };
 
-// 我的收藏：商品 / 店铺 两个 Tab；取消收藏即时移除
+// 我的收藏：商品 / 店铺 两个 Tab；取消收藏即时移除；?tab=shops 直达店铺 Tab
 export default function FavoritesPage() {
-  const [tab, setTab] = useState<"products" | "shops">("products");
+  const [tab, setTab] = useState<"products" | "shops">(() => {
+    if (typeof window === "undefined") return "products";
+    return new URLSearchParams(window.location.search).get("tab") === "shops" ? "shops" : "products";
+  });
   const [status, setStatus] = useState<"loading" | "ready">("loading");
   const [favorites, setFavorites] = useState<FavoriteView[]>([]);
   const [shopFavorites, setShopFavorites] = useState<ShopFavoriteView[]>([]);
@@ -49,10 +52,11 @@ export default function FavoritesPage() {
   }, []);
 
   useEffect(() => {
-    // 初始加载：setState 在 await 之后，非同步级联，规则误报
+    // 初始加载：setState 在 await 之后，非同步级联，规则误报；两个 Tab 数据都先拉好
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadFavorites();
-  }, [loadFavorites]);
+    void loadShopFavorites();
+  }, [loadFavorites, loadShopFavorites]);
 
   async function unfavorite(productId: number) {
     setBusyId(productId);
@@ -70,9 +74,6 @@ export default function FavoritesPage() {
 
   function switchTab(next: "products" | "shops") {
     setTab(next);
-    if (next === "shops" && shopFavorites.length === 0 && status === "ready") {
-      void loadShopFavorites();
-    }
   }
 
   return (

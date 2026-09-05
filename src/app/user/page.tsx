@@ -44,6 +44,9 @@ export default function UserCenterPage() {
     shipped: number;
     unreviewed: number;
   } | null>(null);
+  // 收藏计数（入口红点）
+  const [productFavoriteCount, setProductFavoriteCount] = useState(0);
+  const [shopFavoriteCount, setShopFavoriteCount] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadMe = useCallback(async () => {
@@ -64,6 +67,16 @@ export default function UserCenterPage() {
         unreviewed: number;
       }>;
       if (isApiSuccess(countsRes)) setOrderCounts(countsRes.data);
+
+      // 收藏计数（商品 + 店铺）
+      const [favRes, favShopRes] = await Promise.all([
+        fetch("/api/favorites/ids").then((r) => r.json()),
+        fetch("/api/favorite-shops/ids").then((r) => r.json()),
+      ]);
+      if (isApiSuccess(favRes as ApiResponse<{ ids: number[] }>))
+        setProductFavoriteCount(favRes.data.ids.length);
+      if (isApiSuccess(favShopRes as ApiResponse<{ ids: number[] }>))
+        setShopFavoriteCount(favShopRes.data.ids.length);
     } else {
       setStatus("guest");
     }
@@ -261,6 +274,40 @@ export default function UserCenterPage() {
       <div id="coupons" className="scroll-mt-24">
         <CouponCenter />
       </div>
+
+      {/* 我的收藏入口：商品 + 店铺（数量红点） */}
+      <section className="overflow-hidden rounded-2xl border border-black/10 dark:border-white/15">
+        <h2 className="bg-mist px-6 py-3 text-sm font-semibold dark:bg-white/5">我的收藏</h2>
+        <ul className="divide-y divide-black/5 dark:divide-white/10">
+          {(
+            [
+              { label: "❤️ 收藏的商品", href: "/favorites", count: productFavoriteCount },
+              {
+                label: "🏪 收藏的店铺",
+                href: "/favorites?tab=shops",
+                count: shopFavoriteCount,
+              },
+            ] as { label: string; href: string; count: number }[]
+          ).map((entry) => (
+            <li key={entry.href}>
+              <Link
+                href={entry.href}
+                className="flex items-center justify-between px-6 py-4 text-sm transition-colors hover:bg-mist dark:hover:bg-white/5"
+              >
+                <span className="flex items-center gap-2">
+                  {entry.label}
+                  {entry.count > 0 && (
+                    <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-promo px-1.5 text-[10px] font-bold text-white">
+                      {entry.count > 99 ? "99+" : entry.count}
+                    </span>
+                  )}
+                </span>
+                <span className="opacity-40">›</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </section>
 
       {/* 我的订单：全部入口 + 未处理数量红点 */}
       <section className="overflow-hidden rounded-2xl border border-black/10 dark:border-white/15">
