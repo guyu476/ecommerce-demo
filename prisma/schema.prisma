@@ -67,6 +67,8 @@ model CartItem {
   productId Int      @map("product_id")
   product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
   quantity  Int      @default(1)
+  // 结算勾选：勾中的才随下单结算（全选/单选都在此字段持久化）
+  checked   Boolean  @default(true) @map("checked")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 

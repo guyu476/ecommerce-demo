@@ -10,6 +10,7 @@ import { isApiSuccess } from "@/types/api";
 type CartItem = {
   id: number;
   quantity: number;
+  checked: boolean;
   product: {
     id: number;
     name: string;
@@ -25,12 +26,38 @@ type CartData = {
   totalPrice: number;
 };
 
-// 购物车页：数量增减 / 移除 / 合计（结算流程下一阶段接入）
+// 勾选圈：圆圈按钮，选中填充主题色打勾
+function CheckCircle({ checked, onToggle, disabled }: { checked: boolean; onToggle: () => void; disabled?: boolean }) {
+  return (
+    <button
+      type="button"
+      role="checkbox"
+      aria-checked={checked}
+      aria-label={checked ? "取消勾选" : "勾选结算"}
+      disabled={disabled}
+      onClick={onToggle}
+      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-all disabled:opacity-40 ${
+        checked
+          ? "border-promo bg-promo text-white"
+          : "border-black/25 hover:border-promo dark:border-white/30"
+      }`}
+    >
+      {checked && (
+        <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" aria-hidden>
+          <path d="M3 8.5 L6.5 12 L13 4.5" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      )}
+    </button>
+  );
+}
+
+// 购物车页：勾选结算（单选圈 + 左下角全选）/ 数量增减 / 移除 / 合计只算勾选项
 export default function CartPage() {
   const router = useRouter();
   const [status, setStatus] = useState<"loading" | "guest" | "ready">("loading");
   const [cart, setCart] = useState<CartData | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
+  const [allToggling, setAllToggling] = useState(false);
 
   const loadCart = useCallback(async () => {
     const res = await fetch("/api/cart");
@@ -68,6 +95,30 @@ export default function CartPage() {
     setBusyId(null);
   }
 
+  async function toggleChecked(itemId: number, checked: boolean) {
+    setBusyId(itemId);
+    await fetch(`/api/cart/${itemId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ checked }),
+    });
+    await loadCart();
+    setBusyId(null);
+  }
+
+  async function toggleAll() {
+    if (!cart) return;
+    const everythingChecked = cart.items.every((item) => item.checked);
+    setAllToggling(true);
+    await fetch("/api/cart", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ checked: !everythingChecked }),
+    });
+    await loadCart();
+    setAllToggling(false);
+  }
+
   async function removeItem(itemId: number) {
     setBusyId(itemId);
     await fetch(`/api/cart/${itemId}`, { method: "DELETE" });
@@ -101,6 +152,14 @@ export default function CartPage() {
 
   const items = cart?.items ?? [];
   const isEmpty = items.length === 0;
+  // 合计只算勾选中的条目（与服务端下单口径一致）
+  const checkedItems = items.filter((item) => item.checked);
+  const checkedQuantity = checkedItems.reduce((sum, item) => sum + item.quantity, 0);
+  const checkedTotal = checkedItems.reduce(
+    (sum, item) => sum + Number(item.product.price) * item.quantity,
+    0,
+  );
+  const everythingChecked = !isEmpty && checkedItems.length === items.length;
 
   return (
     <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-8">
@@ -127,11 +186,16 @@ export default function CartPage() {
           <ul className="divide-y divide-black/10 rounded-xl border border-black/10 dark:divide-white/10 dark:border-white/15">
             {items.map((item) => (
               <li key={item.id} className="flex items-center gap-4 p-4">
-                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg bg-mist text-3xl ">
+                <CheckCircle
+                  checked={item.checked}
+                  disabled={busyId === item.id}
+                  onToggle={() => toggleChecked(item.id, !item.checked)}
+                />
+                <div className={`flex h-16 w-16 shrink-0 items-center justify-center rounded-lg bg-mist text-3xl ${item.checked ? "" : "opacity-40"}`}>
                   {item.product.category?.icon ?? "🛍️"}
                 </div>
 
-                <div className="min-w-0 flex-1">
+                <div className={`min-w-0 flex-1 ${item.checked ? "" : "opacity-50"}`}>
                   <Link
                     href={`/products/${item.product.id}`}
                     className="line-clamp-1 text-sm hover:underline"
@@ -143,7 +207,7 @@ export default function CartPage() {
                   </p>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className={`flex items-center gap-2 ${item.checked ? "" : "opacity-40"}`}>
                   <button
                     type="button"
                     aria-label="减少数量"
@@ -165,7 +229,7 @@ export default function CartPage() {
                   </button>
                 </div>
 
-                <p className="w-24 text-right text-sm font-semibold tabular-nums">
+                <p className={`w-24 text-right text-sm font-semibold tabular-nums ${item.checked ? "" : "opacity-40"}`}>
                   {formatPrice(Number(item.product.price) * item.quantity)}
                 </p>
 
@@ -181,19 +245,32 @@ export default function CartPage() {
             ))}
           </ul>
 
-          <div className="mt-6 flex items-center justify-between rounded-xl bg-black/5 px-6 py-4 dark:bg-white/10">
-            <p className="text-sm opacity-70">
-              合计（{cart?.totalQuantity ?? 0} 件）：
-              <span className="ml-1 text-xl font-bold text-red-600 dark:text-red-400">
-                {formatPrice(cart?.totalPrice ?? 0)}
-              </span>
-            </p>
+          {/* 结算栏：左下角全选，合计只算勾选项 */}
+          <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-black/5 px-6 py-4 dark:bg-white/10">
+            <div className="flex items-center gap-6">
+              <label className="flex cursor-pointer items-center gap-2 text-sm">
+                <CheckCircle
+                  checked={everythingChecked}
+                  disabled={allToggling}
+                  onToggle={toggleAll}
+                />
+                全选
+              </label>
+              <p className="text-sm opacity-70">
+                已选 {checkedQuantity} 件，合计：
+                <span className="ml-1 text-xl font-bold text-red-600 dark:text-red-400">
+                  {formatPrice(checkedTotal)}
+                </span>
+              </p>
+            </div>
             <button
               type="button"
+              disabled={checkedItems.length === 0}
               onClick={() => router.push("/checkout")}
-              className="rounded-full bg-promo px-8 py-2.5 text-sm font-medium text-white hover:bg-promo-deep"
+              className="rounded-full bg-promo px-8 py-2.5 text-sm font-medium text-white hover:bg-promo-deep disabled:cursor-not-allowed disabled:opacity-40"
+              title={checkedItems.length === 0 ? "请先勾选要结算的商品" : undefined}
             >
-              去结算
+              {checkedItems.length === 0 ? "请勾选商品" : `去结算（${checkedItems.length} 种）`}
             </button>
           </div>
         </>

@@ -18,10 +18,15 @@ async function getOwnedItem(itemId: number, userId: number) {
   return item;
 }
 
-// PATCH /api/cart/[id] 修改数量 { quantity }
-const updateBodySchema = z.object({
-  quantity: z.coerce.number().int().min(1, "数量至少为 1").max(99, "单件商品最多 99 件"),
-});
+// PATCH /api/cart/[id] 修改数量 { quantity } 或勾选状态 { checked }（至少传一个）
+const updateBodySchema = z
+  .object({
+    quantity: z.coerce.number().int().min(1, "数量至少为 1").max(99, "单件商品最多 99 件").optional(),
+    checked: z.boolean().optional(),
+  })
+  .refine((data) => data.quantity !== undefined || data.checked !== undefined, {
+    message: "至少提供 quantity 或 checked 之一",
+  });
 
 export async function PATCH(request: NextRequest, context: Context) {
   return handleRoute(async () => {
@@ -32,11 +37,14 @@ export async function PATCH(request: NextRequest, context: Context) {
 
     const updated = await prisma.cartItem.update({
       where: { id: item.id },
-      data: { quantity: body.quantity },
+      data: {
+        ...(body.quantity !== undefined ? { quantity: body.quantity } : {}),
+        ...(body.checked !== undefined ? { checked: body.checked } : {}),
+      },
       include: { product: { include: { category: true } } },
     });
 
-    return ok(updated, "数量已更新");
+    return ok(updated, body.checked !== undefined ? "勾选状态已更新" : "数量已更新");
   });
 }
 

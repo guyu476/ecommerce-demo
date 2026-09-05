@@ -59,7 +59,7 @@ npm run dev              # 启动开发服务器，打开 http://localhost:3000
 
 - 商城首页：搜索（名称/描述）、排序（综合/最新/价格升降）、分类票签筛选、热卖轮播、分页、领券条幅
 - 商品详情：多图画廊 + 灯箱、评分与评价列表、加入购物车、收藏心形、进店逛逛
-- 购物车 → 结算：地址簿预填、**优惠券抵扣**（平台券整单满减、店铺券按该店商品小计满减，服务端二次校验）、幂等键防重复下单
+- 购物车 → 结算：**勾选结算**（单品圈选 + 全选，只结算勾中项，状态持久化）、地址簿预填、**优惠券抵扣**（平台券整单满减、店铺券按该店商品小计满减，服务端二次校验）、幂等键防重复下单
 - 订单：模拟支付、查看物流单号、确认收货、**申请退款（售后）**、评价（星级 + 文字）、五入口红点计数
 - 个人中心：昵称/头像、收货地址簿、我的收藏、领券中心（领券 + 我的券）
 
@@ -145,7 +145,7 @@ scripts/                    # 绑图 / 重置演示订单 / 清理测试账号
 | GET `/api/auth/me`                                                            | 当前用户                                                 |
 | GET `/api/categories`                                                         | 分类列表（含在售计数）                                   |
 | GET `/api/products`                                                           | 商品分页：keyword（名称/描述）、sort、categoryId、status |
-| GET/POST `/api/cart`，PATCH/DELETE `/api/cart/[id]`                           | 购物车                                                   |
+| GET/POST/PATCH `/api/cart`（PATCH=全选/取消全选），PATCH/DELETE `/api/cart/[id]`（数量/勾选） | 购物车（`?checkedOnly=1` 只看勾选项） |
 | GET/POST `/api/favorites`，DELETE `?productId=`，GET `/api/favorites/ids`     | 收藏列表 / 收藏 / 取消 / 心形状态                        |
 | GET `/api/coupons`，POST（领取），GET `/api/coupons/mine`                     | 券模板（含平台券/店铺券标识）/ 领取 / 我的券             |
 | GET/POST `/api/merchant/coupons`，DELETE `/api/merchant/coupons/[id]`         | 店铺券管理（商家发券，限本店商品满减；未领取可撤）       |

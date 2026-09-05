@@ -5,14 +5,16 @@ import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 // GET /api/cart 当前用户购物车列表（含商品信息与合计）
+// ?checkedOnly=1 只返回勾选中的条目（结算页用），合计也只算勾选项
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   return handleRoute(async () => {
     const user = await requireUser();
+    const checkedOnly = request.nextUrl.searchParams.get("checkedOnly") === "1";
 
     const items = await prisma.cartItem.findMany({
-      where: { userId: user.id },
+      where: { userId: user.id, ...(checkedOnly ? { checked: true } : {}) },
       orderBy: { updatedAt: "desc" },
       include: { product: { include: { category: true } } },
     });
@@ -25,6 +27,25 @@ export async function GET() {
     );
 
     return ok({ items, totalQuantity, totalPrice });
+  });
+}
+
+// PATCH /api/cart 全选 / 全不选 { checked }（作用于当前用户全部条目）
+const checkAllSchema = z.object({
+  checked: z.boolean(),
+});
+
+export async function PATCH(request: NextRequest) {
+  return handleRoute(async () => {
+    const user = await requireUser();
+    const body = checkAllSchema.parse(await request.json());
+
+    const result = await prisma.cartItem.updateMany({
+      where: { userId: user.id },
+      data: { checked: body.checked },
+    });
+
+    return ok({ updated: result.count }, body.checked ? "已全选" : "已取消全选");
   });
 }
 

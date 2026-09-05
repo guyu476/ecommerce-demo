@@ -82,7 +82,8 @@ export default function CheckoutPage() {
   }
 
   const loadCart = useCallback(async () => {
-    const res = await fetch("/api/cart");
+    // 只拉勾选中的条目（购物车页圈选，这里只结算勾选部分）
+    const res = await fetch("/api/cart?checkedOnly=1");
     const result = (await res.json()) as ApiResponse<CartData>;
     if (result.code === 40101) {
       setStatus("guest");
@@ -224,12 +225,13 @@ export default function CheckoutPage() {
   if (status === "empty" || !cart) {
     return (
       <main className="mx-auto flex w-full max-w-sm flex-1 flex-col items-center justify-center gap-4 px-6 py-24 text-center">
-        <p className="text-sm opacity-70">购物车是空的，没有可结算的商品</p>
+        <p className="text-4xl">🛒</p>
+        <p className="text-sm opacity-70">购物车里没有勾选的商品</p>
         <Link
-          href="/"
+          href="/cart"
           className="rounded-full bg-promo px-8 py-2.5 text-sm font-medium text-white hover:bg-promo-deep"
         >
-          去逛逛
+          回购物车勾选
         </Link>
       </main>
     );

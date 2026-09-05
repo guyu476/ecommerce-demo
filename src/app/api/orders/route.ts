@@ -36,13 +36,13 @@ export async function POST(request: NextRequest) {
           data: { key: idempotencyKey, userId: user.id, requestHash },
         });
 
-        // 2. 读取当前用户购物车
+        // 2. 读取当前用户购物车（只结算勾选中的条目）
         const cartItems = await tx.cartItem.findMany({
-          where: { userId: user.id },
+          where: { userId: user.id, checked: true },
           include: { product: true },
         });
         if (cartItems.length === 0) {
-          throw new ApiError("购物车为空，无法下单", 40003, 400);
+          throw new ApiError("请先勾选要结算的商品", 40003, 400);
         }
 
         // 3. 逐项条件更新扣库存（防超卖），任一失败整体回滚
@@ -151,8 +151,8 @@ export async function POST(request: NextRequest) {
           });
         }
 
-        // 7. 清空已结算的购物车
-        await tx.cartItem.deleteMany({ where: { userId: user.id } });
+        // 7. 清空已结算的购物车（只删勾选结算的条目，未勾选的保留）
+        await tx.cartItem.deleteMany({ where: { userId: user.id, checked: true } });
 
         // 8. 幂等键绑定订单，供后续重放
         await tx.idempotencyKey.update({
