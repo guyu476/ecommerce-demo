@@ -8,11 +8,13 @@ import { prisma } from "@/lib/prisma";
 // ============ POST /api/orders 下单（从购物车结算） ============
 // 契约：必须携带客户端生成的幂等键请求头 Idempotency-Key，重试时复用同一 key。
 // 服务端用唯一约束原子抢占实现幂等：同键同体返回已有订单（重放），同键异体响亮报 422。
+// 优惠券：可选 userCouponId（UNUSED、未过期、满足门槛），事务内核销并记录抵扣金额。
 
 const createBodySchema = z.object({
   recipientName: z.string().trim().min(1, "收货人不能为空").max(50, "收货人最多 50 字"),
   recipientPhone: z.string().regex(/^1[3-9]\d{9}$/, "手机号格式不正确"),
   shippingAddress: z.string().trim().min(5, "收货地址至少 5 个字").max(500, "地址最多 500 字"),
+  userCouponId: z.coerce.number().int().positive().optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -65,16 +67,52 @@ export async function POST(request: NextRequest) {
           });
         }
 
-        // 4. 创建订单 + 条目快照（金额按数据库现价合计）
+        // 4. 优惠券核销：UNUSED + 未过期 + 满门槛，任一不满足则整体回滚
         const totalAmount = snapshots.reduce(
           (sum, item) => sum + Number(item.price) * item.quantity,
           0,
         );
+        let discountAmount = 0;
+        let userCouponId: number | undefined;
+        if (body.userCouponId) {
+          const userCoupon = await tx.userCoupon.findUnique({
+            where: { id: body.userCouponId },
+            include: { coupon: true },
+          });
+          if (!userCoupon || userCoupon.userId !== user.id) {
+            throw new ApiError("优惠券不存在", 40404, 404);
+          }
+          if (userCoupon.status !== "UNUSED") {
+            throw new ApiError("优惠券已被使用", 40906, 409);
+          }
+          if (userCoupon.coupon.expiresAt < new Date()) {
+            throw new ApiError("优惠券已过期", 40906, 409);
+          }
+          if (Number(userCoupon.coupon.threshold) > totalAmount) {
+            throw new ApiError(
+              `该券满 ${Number(userCoupon.coupon.threshold)} 元可用，还差一点哦`,
+              40906,
+              409,
+            );
+          }
+          const claimed = await tx.userCoupon.updateMany({
+            where: { id: userCoupon.id, status: "UNUSED" },
+            data: { status: "USED", usedAt: new Date() },
+          });
+          if (claimed.count === 0) {
+            throw new ApiError("优惠券已被使用", 40906, 409);
+          }
+          discountAmount = Number(userCoupon.coupon.discount);
+          userCouponId = userCoupon.id;
+        }
+
+        // 5. 创建订单 + 条目快照（金额按数据库现价合计；应付 = 合计 - 券抵扣）
         const order = await tx.order.create({
           data: {
             orderNo: generateOrderNo(),
             userId: user.id,
             totalAmount,
+            discountAmount,
             recipientName: body.recipientName,
             recipientPhone: body.recipientPhone,
             shippingAddress: body.shippingAddress,
@@ -90,10 +128,18 @@ export async function POST(request: NextRequest) {
           include: { items: true },
         });
 
-        // 5. 清空已结算的购物车
+        // 6. 绑定用掉的券（一单一券，唯一约束兜底）
+        if (userCouponId) {
+          await tx.userCoupon.update({
+            where: { id: userCouponId },
+            data: { orderId: order.id },
+          });
+        }
+
+        // 7. 清空已结算的购物车
         await tx.cartItem.deleteMany({ where: { userId: user.id } });
 
-        // 6. 幂等键绑定订单，供后续重放
+        // 8. 幂等键绑定订单，供后续重放
         await tx.idempotencyKey.update({
           where: { key: idempotencyKey },
           data: { orderId: order.id },
@@ -163,7 +209,11 @@ export async function GET(request: NextRequest) {
       prisma.order.count({ where }),
       prisma.order.findMany({
         where,
-        include: { items: true, reviews: { select: { productId: true } } },
+        include: {
+          items: true,
+          reviews: { select: { productId: true } },
+          coupon: { include: { coupon: true } },
+        },
         orderBy: { createdAt: "desc" },
         skip: (query.page - 1) * query.pageSize,
         take: query.pageSize,

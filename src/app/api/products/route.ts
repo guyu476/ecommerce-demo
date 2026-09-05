@@ -2,24 +2,46 @@ import type { NextRequest } from "next/server";
 import { z } from "zod";
 import { ApiError, handleRoute, ok } from "@/lib/api-response";
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
 
 // ============ GET /api/products 商品分页列表 ============
-// 查询参数：page、pageSize、keyword（名称模糊搜索）、categoryId、status（默认只看在售，传 all 查全部）
+// 查询参数：page、pageSize、keyword（名称/描述模糊搜索）、categoryId、
+//           sort（default 销量优先 / newest 最新 / price-asc / price-desc）、
+//           status（默认只看在售，传 all 查全部）
 
 const listQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(10),
   keyword: z.string().trim().max(100).optional(),
   categoryId: z.coerce.number().int().positive().optional(),
+  sort: z.enum(["default", "newest", "price-asc", "price-desc"]).default("default"),
   status: z.enum(["DRAFT", "ON_SALE", "OFF_SALE", "all"]).default("ON_SALE"),
 });
+
+const SORT_ORDER: Record<
+  "default" | "newest" | "price-asc" | "price-desc",
+  Prisma.ProductOrderByWithRelationInput[]
+> = {
+  default: [{ sales: "desc" }, { createdAt: "desc" }],
+  newest: [{ createdAt: "desc" }],
+  "price-asc": [{ price: "asc" }, { sales: "desc" }],
+  "price-desc": [{ price: "desc" }, { sales: "desc" }],
+};
 
 export async function GET(request: NextRequest) {
   return handleRoute(async () => {
     const query = listQuerySchema.parse(Object.fromEntries(request.nextUrl.searchParams));
 
     const where = {
-      ...(query.keyword ? { name: { contains: query.keyword } } : {}),
+      // 名称或描述命中任一即算匹配（MySQL contains 默认大小写不敏感）
+      ...(query.keyword
+        ? {
+            OR: [
+              { name: { contains: query.keyword } },
+              { description: { contains: query.keyword } },
+            ],
+          }
+        : {}),
       ...(query.categoryId != null ? { categoryId: query.categoryId } : {}),
       ...(query.status !== "all" ? { status: query.status } : {}),
     };
@@ -40,7 +62,7 @@ export async function GET(request: NextRequest) {
       prisma.product.findMany({
         where,
         include: { category: true },
-        orderBy: [{ sales: "desc" }, { createdAt: "desc" }],
+        orderBy: SORT_ORDER[query.sort],
         skip: (query.page - 1) * query.pageSize,
         take: query.pageSize,
       }),

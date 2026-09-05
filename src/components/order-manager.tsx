@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { formatPrice } from "@/lib/format";
+import { payableAmount } from "@/types/order";
 import type { ApiResponse } from "@/types/api";
 import { isApiSuccess } from "@/types/api";
 
@@ -9,6 +10,12 @@ type OrderView = {
   id: number;
   orderNo: string;
   status: string;
+  refundStatus: string;
+  refundReason: string | null;
+  refundAmount: string | null;
+  trackingNo: string | null;
+  totalAmount: string;
+  discountAmount: string;
   recipientName: string;
   recipientPhone: string;
   shippingAddress: string;
@@ -33,7 +40,7 @@ const STATUS_STYLE: Record<string, string> = {
   CANCELLED: "line-through opacity-40",
 };
 
-// 订单管理器：商家（含我商品的订单，可发货）/ 管理员（全部订单，全权操作）共用
+// 订单管理器：商家（含我商品的订单，可发货/处理退款）/ 管理员（全部订单，只读监督）共用
 export function OrderManager({ role }: { role: "MERCHANT" | "ADMIN" }) {
   const [orders, setOrders] = useState<OrderView[]>([]);
   const [loading, setLoading] = useState(true);
@@ -41,9 +48,15 @@ export function OrderManager({ role }: { role: "MERCHANT" | "ADMIN" }) {
   const [keyword, setKeyword] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 
-  // 查询：单号 / 买家 / 收货人 / 商品名 + 状态筛选
+  // 发货：展开内联单号输入（留空自动生成演示单号）
+  const [shipTarget, setShipTarget] = useState<number | null>(null);
+  const [shipTracking, setShipTracking] = useState("");
+
+  // 查询：单号 / 买家 / 收货人 / 商品名 + 状态筛选（refund = 退款待处理）
   const filtered = orders.filter((order) => {
-    if (statusFilter !== "all" && order.status !== statusFilter) return false;
+    if (statusFilter !== "all" && order.status !== statusFilter) {
+      if (!(statusFilter === "refund" && order.refundStatus === "REQUESTED")) return false;
+    }
     const text = keyword.trim().toLowerCase();
     if (!text) return true;
     return (
@@ -62,17 +75,30 @@ export function OrderManager({ role }: { role: "MERCHANT" | "ADMIN" }) {
   }, []);
 
   useEffect(() => {
-    // 初始加载：setState 在 await 之后，规则误报
+    // 初始加载：setState 在 await 之后，非同步级联，规则误报
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadOrders();
   }, [loadOrders]);
 
-  async function transition(orderId: number, action: "pay" | "ship" | "confirm") {
+  async function transition(orderId: number, action: "ship", trackingNo?: string) {
     setBusyId(orderId);
     await fetch(`/api/orders/${orderId}/transition`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action }),
+      body: JSON.stringify({ action, ...(trackingNo ? { trackingNo } : {}) }),
+    });
+    setShipTarget(null);
+    setShipTracking("");
+    await loadOrders();
+    setBusyId(null);
+  }
+
+  async function handleRefund(orderId: number, approve: boolean) {
+    setBusyId(orderId);
+    await fetch(`/api/orders/${orderId}/refund`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: approve ? "approve" : "reject" }),
     });
     await loadOrders();
     setBusyId(null);
@@ -112,6 +138,7 @@ export function OrderManager({ role }: { role: "MERCHANT" | "ADMIN" }) {
           <option value="SHIPPED">已发货</option>
           <option value="COMPLETED">已完成</option>
           <option value="CANCELLED">已取消</option>
+          <option value="refund">退款待处理</option>
         </select>
       </div>
 
@@ -135,6 +162,56 @@ export function OrderManager({ role }: { role: "MERCHANT" | "ADMIN" }) {
                 </span>
               </div>
 
+              {/* 退款申请横幅：商家处理入口 */}
+              {order.refundStatus === "REQUESTED" && (
+                <div className="flex flex-wrap items-center justify-between gap-2 bg-promo/10 px-4 py-2.5 text-xs">
+                  <p className="text-promo">
+                    💸 买家申请退款
+                    {order.refundAmount != null && (
+                      <span className="ml-1 font-mono font-semibold">
+                        {formatPrice(payableAmount(order.totalAmount, order.discountAmount))}
+                      </span>
+                    )}
+                    {order.refundReason && (
+                      <span className="ml-2 opacity-80">原因：{order.refundReason}</span>
+                    )}
+                  </p>
+                  {role === "MERCHANT" && (
+                    <span className="flex gap-2">
+                      <button
+                        type="button"
+                        disabled={busyId === order.id}
+                        onClick={() => handleRefund(order.id, true)}
+                        className="rounded-full bg-promo px-4 py-1.5 font-medium text-white disabled:opacity-40"
+                      >
+                        同意退款（模拟打款）
+                      </button>
+                      <button
+                        type="button"
+                        disabled={busyId === order.id}
+                        onClick={() => handleRefund(order.id, false)}
+                        className="rounded-full border border-promo/50 px-4 py-1.5 font-medium text-promo disabled:opacity-40"
+                      >
+                        拒绝
+                      </button>
+                    </span>
+                  )}
+                </div>
+              )}
+              {order.refundStatus === "REFUNDED" && (
+                <div className="bg-emerald-500/10 px-4 py-2 text-xs text-emerald-600">
+                  ✓ 已退款（模拟打款原路退回）
+                  {order.refundReason && (
+                    <span className="ml-2 opacity-70">原因：{order.refundReason}</span>
+                  )}
+                </div>
+              )}
+              {order.refundStatus === "REJECTED" && (
+                <div className="px-4 py-2 text-xs opacity-60">
+                  已拒绝退款申请{order.refundReason ? `（原因：${order.refundReason}）` : ""}
+                </div>
+              )}
+
               <ul className="divide-y divide-black/5 px-4 text-sm dark:divide-white/10">
                 {order.items.map((item) => (
                   <li key={item.productId} className="flex items-center gap-3 py-2.5">
@@ -149,18 +226,54 @@ export function OrderManager({ role }: { role: "MERCHANT" | "ADMIN" }) {
               <div className="flex flex-wrap items-center justify-between gap-2 border-t border-black/5 px-4 py-3 text-xs dark:border-white/10">
                 <span className="opacity-60">
                   {order.recipientName} · {order.recipientPhone} · {order.shippingAddress}
+                  {order.trackingNo && (
+                    <span className="ml-2 font-mono">🚚 {order.trackingNo}</span>
+                  )}
                 </span>
-                {/* 发货仅商家可操作；管理员只读监督 */}
-                {role === "MERCHANT" && order.status === "PAID" && (
-                  <button
-                    type="button"
-                    disabled={busyId === order.id}
-                    onClick={() => transition(order.id, "ship")}
-                    className="rounded-full bg-ink px-5 py-1.5 font-medium text-white disabled:opacity-40"
-                  >
-                    {busyId === order.id ? "处理中…" : "发货"}
-                  </button>
-                )}
+                {/* 发货仅商家可操作（可填演示单号）；管理员只读监督 */}
+                {role === "MERCHANT" &&
+                  order.status === "PAID" &&
+                  (shipTarget === order.id ? (
+                    <span className="flex items-center gap-2">
+                      <input
+                        autoFocus
+                        value={shipTracking}
+                        onChange={(e) => setShipTracking(e.target.value)}
+                        maxLength={64}
+                        placeholder="物流单号，留空自动生成"
+                        className="w-52 rounded-full border border-black/15 px-3 py-1.5 outline-none focus:border-promo dark:border-white/20"
+                      />
+                      <button
+                        type="button"
+                        disabled={busyId === order.id}
+                        onClick={() =>
+                          transition(order.id, "ship", shipTracking.trim() || undefined)
+                        }
+                        className="rounded-full bg-ink px-4 py-1.5 font-medium text-white disabled:opacity-40"
+                      >
+                        确认发货
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShipTarget(null);
+                          setShipTracking("");
+                        }}
+                        className="opacity-50 hover:opacity-100"
+                      >
+                        取消
+                      </button>
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={busyId === order.id}
+                      onClick={() => setShipTarget(order.id)}
+                      className="rounded-full bg-ink px-5 py-1.5 font-medium text-white disabled:opacity-40"
+                    >
+                      {busyId === order.id ? "处理中…" : "发货"}
+                    </button>
+                  ))}
               </div>
             </li>
           ))}

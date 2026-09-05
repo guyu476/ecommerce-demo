@@ -159,6 +159,18 @@ async function main() {
     },
   });
 
+  // 演示店铺：一人一店，挂到商家账号（幂等按 ownerId）
+  const demoShop = await prisma.shop.upsert({
+    where: { ownerId: merchantUser.id },
+    update: { name: "鸟西数码旗舰店", logo: "🏪" },
+    create: {
+      ownerId: merchantUser.id,
+      name: "鸟西数码旗舰店",
+      logo: "🏪",
+      description: "专注手机数码与电脑外设，官方直营，全国联保，48 小时发货。",
+    },
+  });
+
   // 分类按 slug 幂等写入
   const categoryMap = new Map<string, number>();
   for (const category of categories) {
@@ -184,8 +196,14 @@ async function main() {
     });
     if (existing) {
       productIdByName.set(product.name, existing.id);
+      const shopId = sellerId !== null ? demoShop.id : null;
       if (existing.sellerId === null && sellerId !== null) {
-        await prisma.product.update({ where: { id: existing.id }, data: { sellerId } });
+        await prisma.product.update({
+          where: { id: existing.id },
+          data: { sellerId, shopId },
+        });
+      } else if (sellerId !== null && existing.shopId === null) {
+        await prisma.product.update({ where: { id: existing.id }, data: { shopId } });
       }
       continue;
     }
@@ -199,6 +217,7 @@ async function main() {
         status: ProductStatus.ON_SALE,
         categoryId: categoryMap.get(product.categorySlug),
         sellerId,
+        shopId: sellerId !== null ? demoShop.id : null,
       },
     });
     productIdByName.set(product.name, record.id);
@@ -265,7 +284,7 @@ async function main() {
     }
   }
 
-  // 演示订单 2：已发货（待评价，给「待评价」入口留演示数据）
+  // 演示订单 2：已发货（带物流单号，待评价，给「待评价」入口留演示数据）
   const shippedProduct = "机械键盘 87 键 红轴";
   await prisma.order.upsert({
     where: { orderNo: "DEMO202609010002" },
@@ -275,6 +294,8 @@ async function main() {
       userId: demoUser.id,
       status: "SHIPPED",
       totalAmount: 329,
+      trackingNo: "BX20260903090000123456",
+      shippedAt: new Date(),
       recipientName: "演示用户",
       recipientPhone: "13800138000",
       shippingAddress: "浙江省杭州市西湖区文三路 100 号",
@@ -291,8 +312,31 @@ async function main() {
     },
   });
 
+  // 演示优惠券：未过期满减券两张（幂等按 title；每人限领一张由业务约束保证）
+  const nextYear = new Date();
+  nextYear.setFullYear(nextYear.getFullYear() + 1);
+  const couponSpecs = [
+    { title: "新人专享满 99 减 20", threshold: 99, discount: 20, totalCount: 1000 },
+    { title: "数码狂嗨满 1000 减 120", threshold: 1000, discount: 120, totalCount: 200 },
+    { title: "周末加餐满 200 减 30", threshold: 200, discount: 30, totalCount: 500 },
+  ];
+  for (const spec of couponSpecs) {
+    const existing = await prisma.coupon.findFirst({ where: { title: spec.title } });
+    if (!existing) {
+      await prisma.coupon.create({
+        data: {
+          title: spec.title,
+          threshold: spec.threshold,
+          discount: spec.discount,
+          totalCount: spec.totalCount,
+          expiresAt: nextYear,
+        },
+      });
+    }
+  }
+
   console.log(
-    `种子数据完成：分类 ${categories.length} 个，新写入商品 ${created} 个（共 ${products.length} 条），演示订单 2 笔 + 评价 2 条`,
+    `种子数据完成：分类 ${categories.length} 个，新写入商品 ${created} 个（共 ${products.length} 条），演示订单 2 笔 + 评价 2 条，店铺 1 家（${demoShop.name}），优惠券 ${couponSpecs.length} 张`,
   );
 }
 

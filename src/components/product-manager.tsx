@@ -156,7 +156,7 @@ export function ProductManager() {
     setFieldErrors({});
   }
 
-  // 图片上传：逐张压缩，最多 6 张
+  // 图片上传：逐张压缩成 600px 方图，再传到 /api/upload 存为站点文件（不再把 data URL 存库）
   async function handleImageFiles(e: React.ChangeEvent<HTMLInputElement>) {
     const files = [...(e.target.files ?? [])];
     e.target.value = "";
@@ -167,15 +167,26 @@ export function ProductManager() {
     }
     setBusy(true);
     try {
-      const compressed: string[] = [];
+      const uploaded: string[] = [];
       for (const file of files) {
         if (!file.type.startsWith("image/")) continue;
-        compressed.push(await compressImage(file));
+        const dataUrl = await compressImage(file);
+        const blob = await (await fetch(dataUrl)).blob();
+        const formData = new FormData();
+        formData.append("file", blob, "image.jpg");
+        const res = await fetch("/api/upload", { method: "POST", body: formData });
+        const result = (await res.json()) as ApiResponse<{ url: string }>;
+        if (!isApiSuccess(result)) {
+          throw new Error(result.message);
+        }
+        uploaded.push(result.data.url);
       }
-      setFormImages((prev) => [...prev, ...compressed]);
-      setError(null);
+      if (uploaded.length > 0) {
+        setFormImages((prev) => [...prev, ...uploaded]);
+        setError(null);
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "图片处理失败");
+      setError(err instanceof Error ? err.message : "图片上传失败");
     } finally {
       setBusy(false);
     }

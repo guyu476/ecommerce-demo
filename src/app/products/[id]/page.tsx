@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AddToCartButton } from "@/components/add-to-cart-button";
 import { DbSetupNotice } from "@/components/db-setup-notice";
+import { FavoriteButton } from "@/components/favorite-button";
 import { ProductGallery } from "@/components/product-gallery";
 import { formatPrice, formatSales } from "@/lib/format";
 import { getProductById, parseProductImages } from "@/lib/queries";
@@ -115,8 +116,22 @@ export default async function ProductDetailPage({ params }: Props) {
             </p>
           )}
 
-          <div className="mt-auto pt-2">
+          {/* 进店逛逛：商品挂了店铺时展示 */}
+          {product.shop && (
+            <Link
+              href={`/shops/${product.shop.id}`}
+              className="inline-flex items-center gap-2 self-start rounded-full border-2 border-dashed border-market/70 px-4 py-2 text-sm font-medium transition-all hover:-rotate-1 hover:bg-market/10"
+            >
+              <span aria-hidden className="text-base">
+                {product.shop.logo ?? "🏪"}
+              </span>
+              {product.shop.name} · 进店逛逛 →
+            </Link>
+          )}
+
+          <div className="mt-auto flex items-center gap-3 pt-2">
             <AddToCartButton productId={product.id} disabled={product.stock <= 0} />
+            <FavoriteButton productId={product.id} />
           </div>
         </div>
       </div>

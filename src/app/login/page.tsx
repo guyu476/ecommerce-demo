@@ -7,22 +7,29 @@ import type { ApiResponse } from "@/types/api";
 
 // 登录页（市集画报风 · 参考主流电商登录 UI）
 // 密码登录（邮箱/手机号）+ 短信登录（演示环境模拟验证码，未注册自动创建账号）
+// + 找回密码（演示环境模拟短信验证码，任意 6 位数字通过）
 export default function LoginPage() {
   const router = useRouter();
-  const [tab, setTab] = useState<"password" | "sms">("password");
+  const [tab, setTab] = useState<"password" | "sms" | "reset">("password");
   const [account, setAccount] = useState("");
   const [password, setPassword] = useState("");
   const [agreed, setAgreed] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
-  const [forgotHint, setForgotHint] = useState(false);
 
   // 短信登录状态（演示环境：点击获取验证码后模拟显示，服务端不做真实校验）
   const [smsPhone, setSmsPhone] = useState("");
   const [smsCode, setSmsCode] = useState("");
   const [mockCode, setMockCode] = useState<string | null>(null);
   const [countdown, setCountdown] = useState(0);
+
+  // 找回密码状态（与短信登录同一套模拟口径）
+  const [resetPhone, setResetPhone] = useState("");
+  const [resetCode, setResetCode] = useState("");
+  const [resetPassword, setResetPassword] = useState("");
+  const [resetMockCode, setResetMockCode] = useState<string | null>(null);
 
   useEffect(() => {
     if (countdown <= 0) return;
@@ -43,6 +50,22 @@ export default function LoginPage() {
     setCountdown(60);
   }
 
+  function sendResetCode() {
+    if (!/^1[3-9]\d{9}$/.test(resetPhone)) {
+      setError("请先输入正确的手机号");
+      return;
+    }
+    setError(null);
+    setResetMockCode(String(Math.floor(100000 + Math.random() * 900000)));
+    setCountdown(60);
+  }
+
+  function switchTab(next: "password" | "sms" | "reset") {
+    setTab(next);
+    setError(null);
+    setFieldErrors({});
+  }
+
   function navigateAfterAuth() {
     const redirect = new URLSearchParams(window.location.search).get("redirect");
     router.push(redirect && redirect.startsWith("/") ? redirect : "/");
@@ -51,6 +74,32 @@ export default function LoginPage() {
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
+
+    // 找回密码：不参与协议勾选校验，成功后回密码登录
+    if (tab === "reset") {
+      setSubmitting(true);
+      setError(null);
+      try {
+        const res = await fetch("/api/auth/reset-password", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ phone: resetPhone, code: resetCode, newPassword: resetPassword }),
+        });
+        const result = (await res.json()) as ApiResponse;
+        if (result.code !== 0) {
+          setError(result.message);
+          return;
+        }
+        setTab("password");
+        setNotice("密码已重置，请用新密码登录");
+      } catch {
+        setError("网络异常，请稍后重试");
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
+
     if (!agreed) {
       setError("请先阅读并同意《鸟西商城服务协议》与《隐私权政策》");
       return;
@@ -98,7 +147,7 @@ export default function LoginPage() {
       <div className="mb-10 flex items-center justify-center gap-6">
         <button
           type="button"
-          onClick={() => setTab("password")}
+          onClick={() => switchTab("password")}
           className={`text-2xl font-bold tracking-wide transition-colors ${
             tab === "password"
               ? "text-promo"
@@ -110,18 +159,29 @@ export default function LoginPage() {
         <span className="h-6 w-px bg-black/15 dark:bg-white/20" aria-hidden />
         <button
           type="button"
-          onClick={() => setTab("sms")}
+          onClick={() => switchTab("sms")}
           className={`text-2xl font-bold tracking-wide transition-colors ${
             tab === "sms" ? "text-promo" : "text-black/35 hover:text-black/60 dark:text-white/40"
           }`}
         >
           短信登录
         </button>
+        {tab === "reset" && (
+          <>
+            <span className="h-6 w-px bg-black/15 dark:bg-white/20" aria-hidden />
+            <span className="text-2xl font-bold tracking-wide text-promo">找回密码</span>
+          </>
+        )}
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         {tab === "password" ? (
           <>
+            {notice && (
+              <p className="rounded-lg bg-emerald-500/10 px-4 py-2.5 text-xs text-emerald-600">
+                {notice}
+              </p>
+            )}
             <input
               id="account"
               type="text"
@@ -143,21 +203,16 @@ export default function LoginPage() {
               />
               <button
                 type="button"
-                onClick={() => setForgotHint(true)}
+                onClick={() => switchTab("reset")}
                 className="absolute top-1/2 right-5 -translate-y-1/2 text-xs text-black/45 hover:text-promo dark:text-white/45"
               >
                 忘记密码
               </button>
             </div>
-            {forgotHint && (
-              <p className="text-xs opacity-55">
-                演示环境暂未开通找回密码；注册页可用短信验证码直接登录
-              </p>
-            )}
             {fieldErrors.account && <p className="text-xs text-red-500">{fieldErrors.account}</p>}
             {fieldErrors.password && <p className="text-xs text-red-500">{fieldErrors.password}</p>}
           </>
-        ) : (
+        ) : tab === "sms" ? (
           <>
             <input
               id="smsPhone"
@@ -199,6 +254,66 @@ export default function LoginPage() {
               </p>
             )}
           </>
+        ) : (
+          <>
+            <input
+              id="resetPhone"
+              type="tel"
+              required
+              inputMode="numeric"
+              maxLength={11}
+              value={resetPhone}
+              onChange={(e) => setResetPhone(e.target.value.replace(/\D/g, ""))}
+              placeholder="请输入注册时的手机号"
+              className={inputClass}
+            />
+            <div className="relative">
+              <input
+                id="resetCode"
+                type="text"
+                required
+                inputMode="numeric"
+                maxLength={6}
+                value={resetCode}
+                onChange={(e) => setResetCode(e.target.value.replace(/\D/g, ""))}
+                placeholder="请输入 6 位验证码"
+                className={inputClass + " pr-28"}
+              />
+              <button
+                type="button"
+                onClick={sendResetCode}
+                disabled={countdown > 0}
+                className="absolute top-1/2 right-4 -translate-y-1/2 text-xs text-promo disabled:opacity-40"
+              >
+                {countdown > 0 ? `${countdown}s 后重发` : "获取验证码"}
+              </button>
+            </div>
+            {resetMockCode && (
+              <p className="rounded-lg bg-mist px-4 py-2.5 text-xs dark:bg-white/10">
+                📩 模拟短信已发送（演示环境不发真实短信）：验证码{" "}
+                <span className="font-mono font-bold text-promo">{resetMockCode}</span>
+                ，输入它即可设置新密码
+              </p>
+            )}
+            <input
+              id="newPassword"
+              type="password"
+              required
+              minLength={8}
+              maxLength={64}
+              value={resetPassword}
+              onChange={(e) => setResetPassword(e.target.value)}
+              placeholder="设置新密码（至少 8 位）"
+              className={inputClass}
+            />
+            <button
+              type="button"
+              onClick={() => switchTab("password")}
+              className="self-start text-xs text-black/45 hover:text-promo dark:text-white/45"
+            >
+              ← 想起密码了，返回登录
+            </button>
+          </>
         )}
 
         {error && <p className="text-sm text-red-500">{error}</p>}
@@ -208,7 +323,7 @@ export default function LoginPage() {
           disabled={submitting}
           className="w-full rounded-xl bg-promo py-4 text-lg font-bold tracking-[0.3em] text-white transition-colors hover:bg-promo-deep disabled:opacity-50"
         >
-          {submitting ? "登录中…" : "登录"}
+          {submitting ? "处理中…" : tab === "reset" ? "重置密码" : "登录"}
         </button>
       </form>
 

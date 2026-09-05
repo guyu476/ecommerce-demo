@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { OrderManager } from "@/components/order-manager";
 import { ProductManager } from "@/components/product-manager";
+import { ShopSettings } from "@/components/shop-settings";
 import type { ApiResponse } from "@/types/api";
 import { isApiSuccess } from "@/types/api";
 
@@ -92,6 +93,7 @@ export default function MerchantPage() {
         </p>
       </div>
 
+      <ShopSettings />
       <ProductManager />
       <section className="space-y-4">
         <h2 className="text-lg font-extrabold tracking-tight">订单发货</h2>

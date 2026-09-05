@@ -21,19 +21,22 @@ enum UserRole {
 }
 
 model User {
-  id           Int        @id @default(autoincrement())
-  email        String?    @unique @db.VarChar(200)
-  phone        String?    @unique @db.VarChar(20)
-  passwordHash String     @map("password_hash") @db.VarChar(100)
-  nickname     String     @db.VarChar(50)
-  role         UserRole   @default(USER)
-  avatar       String?    @db.Text
-  createdAt    DateTime   @default(now()) @map("created_at")
+  id           Int          @id @default(autoincrement())
+  email        String?      @unique @db.VarChar(200)
+  phone        String?      @unique @db.VarChar(20)
+  passwordHash String       @map("password_hash") @db.VarChar(100)
+  nickname     String       @db.VarChar(50)
+  role         UserRole     @default(USER)
+  avatar       String?      @db.Text
+  createdAt    DateTime     @default(now()) @map("created_at")
   cartItems    CartItem[]
   orders       Order[]
   reviews      Review[]
   addresses    Address[]
   products     Product[]
+  shops        Shop[]
+  favorites    Favorite[]
+  userCoupons  UserCoupon[]
 
   @@map("users")
 }
@@ -107,15 +110,58 @@ model Product {
   category    Category?     @relation(fields: [categoryId], references: [id])
   sellerId    Int?          @map("seller_id")
   seller      User?         @relation(fields: [sellerId], references: [id])
+  shopId      Int?          @map("shop_id")
+  shop        Shop?         @relation(fields: [shopId], references: [id])
   createdAt   DateTime      @default(now()) @map("created_at")
   updatedAt   DateTime      @updatedAt @map("updated_at")
   cartItems   CartItem[]
   orderItems  OrderItem[]
   reviews     Review[]
+  favorites   Favorite[]
 
   @@index([categoryId])
   @@index([status])
+  @@index([shopId])
   @@map("products")
+}
+
+// 收藏夹：商品详情页心形按钮，一用户一商品一条
+model Favorite {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId Int      @map("product_id")
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([userId, productId])
+  @@index([productId])
+  @@map("favorites")
+}
+
+// ==================== 店铺 ====================
+
+enum ShopStatus {
+  OPEN
+  CLOSED
+
+  @@map("shop_status")
+}
+
+// 店铺：商家入驻实体（演示版一人一店），商品通过 shopId 归属店铺
+model Shop {
+  id          Int        @id @default(autoincrement())
+  ownerId     Int        @unique @map("owner_id")
+  owner       User       @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  name        String     @db.VarChar(100)
+  description String?    @db.VarChar(500)
+  logo        String?    @db.VarChar(16)
+  status      ShopStatus @default(OPEN)
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+  products    Product[]
+
+  @@map("shops")
 }
 
 // 商品评价：一单一商品一条评价（订单完成后可评）
@@ -148,23 +194,45 @@ enum OrderStatus {
   @@map("order_status")
 }
 
+// 售后退款：NONE 无申请；REQUESTED 买家已申请；REFUNDED 已退款（模拟打款）；REJECTED 商家驳回
+// 驳回后可重新申请（REQUESTED 覆盖 REJECTED）；同意后订单转 CANCELLED 并回补库存
+enum RefundStatus {
+  NONE
+  REQUESTED
+  REFUNDED
+  REJECTED
+
+  @@map("refund_status")
+}
+
 model Order {
-  id              Int         @id @default(autoincrement())
-  orderNo         String      @unique @map("order_no") @db.VarChar(32)
-  userId          Int         @map("user_id")
-  user            User        @relation(fields: [userId], references: [id])
-  status          OrderStatus @default(PENDING_PAYMENT)
-  totalAmount     Decimal     @map("total_amount") @db.Decimal(10, 2)
-  recipientName   String      @map("recipient_name") @db.VarChar(50)
-  recipientPhone  String      @map("recipient_phone") @db.VarChar(20)
-  shippingAddress String      @map("shipping_address") @db.VarChar(500)
+  id              Int          @id @default(autoincrement())
+  orderNo         String       @unique @map("order_no") @db.VarChar(32)
+  userId          Int          @map("user_id")
+  user            User         @relation(fields: [userId], references: [id])
+  status          OrderStatus  @default(PENDING_PAYMENT)
+  totalAmount     Decimal      @map("total_amount") @db.Decimal(10, 2)
+  discountAmount  Decimal      @default(0) @map("discount_amount") @db.Decimal(10, 2)
+  refundStatus    RefundStatus @default(NONE) @map("refund_status")
+  refundReason    String?      @map("refund_reason") @db.VarChar(200)
+  refundAmount    Decimal?     @map("refund_amount") @db.Decimal(10, 2)
+  refundHandledAt DateTime?    @map("refund_handled_at")
+  trackingNo      String?      @map("tracking_no") @db.VarChar(64)
+  paidAt          DateTime?    @map("paid_at")
+  shippedAt       DateTime?    @map("shipped_at")
+  completedAt     DateTime?    @map("completed_at")
+  recipientName   String       @map("recipient_name") @db.VarChar(50)
+  recipientPhone  String       @map("recipient_phone") @db.VarChar(20)
+  shippingAddress String       @map("shipping_address") @db.VarChar(500)
+  coupon          UserCoupon?
   items           OrderItem[]
   reviews         Review[]
   idempotencyKeys IdempotencyKey[]
-  createdAt       DateTime    @default(now()) @map("created_at")
-  updatedAt       DateTime    @updatedAt @map("updated_at")
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
 
   @@index([userId])
+  @@index([status])
   @@map("orders")
 }
 
@@ -196,4 +264,47 @@ model IdempotencyKey {
 
   @@index([userId])
   @@map("idempotency_keys")
+}
+
+// ==================== 优惠券 ====================
+
+enum CouponStatus {
+  UNUSED
+  USED
+
+  @@map("coupon_status")
+}
+
+// 券模板：满 threshold 减 discount，限领一张（totalCount 用完即止，条件更新防超发）
+model Coupon {
+  id           Int          @id @default(autoincrement())
+  title        String       @db.VarChar(100)
+  threshold    Decimal      @db.Decimal(10, 2)
+  discount     Decimal      @db.Decimal(10, 2)
+  totalCount   Int          @map("total_count")
+  claimedCount Int          @default(0) @map("claimed_count")
+  expiresAt    DateTime     @map("expires_at")
+  createdAt    DateTime     @default(now()) @map("created_at")
+  userCoupons  UserCoupon[]
+
+  @@map("coupons")
+}
+
+// 用户持有的券：下单抵扣后置 USED；orderId 唯一保证一单至多用一张券
+model UserCoupon {
+  id        Int          @id @default(autoincrement())
+  userId    Int          @map("user_id")
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  couponId  Int          @map("coupon_id")
+  coupon    Coupon       @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  status    CouponStatus @default(UNUSED)
+  usedAt    DateTime?    @map("used_at")
+  order     Order?       @relation(fields: [orderId], references: [id])
+  orderId   Int?         @unique @map("order_id")
+  createdAt DateTime     @default(now()) @map("created_at")
+
+  @@unique([userId, couponId])
+  @@index([userId])
+  @@index([couponId])
+  @@map("user_coupons")
 }

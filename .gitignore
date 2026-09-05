@@ -46,3 +46,6 @@ next-env.d.ts
 
 # workbuddy temp upload manifest
 .upload-manifest.json
+
+# 用户上传的商品图片（运行时生成，不入库不进 git）
+/public/uploads

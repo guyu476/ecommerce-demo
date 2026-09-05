@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { AdminDashboard } from "@/components/admin-dashboard";
 import { OrderManager } from "@/components/order-manager";
 import { ProductManager } from "@/components/product-manager";
 import type { ApiResponse } from "@/types/api";
@@ -24,12 +25,12 @@ const ROLE_LABEL: Record<string, string> = {
   ADMIN: "管理员",
 };
 
-type AdminTab = "products" | "orders" | "users";
+type AdminTab = "dashboard" | "products" | "orders" | "users";
 
-// 管理后台：商品管理 / 订单管理 / 用户管理（仅管理员）
+// 管理后台：数据看板 / 商品管理 / 订单管理 / 用户管理（仅管理员）
 export default function AdminPage() {
   const [status, setStatus] = useState<"loading" | "guest" | "denied" | "ready">("loading");
-  const [tab, setTab] = useState<AdminTab>("products");
+  const [tab, setTab] = useState<AdminTab>("dashboard");
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [busyUserId, setBusyUserId] = useState<number | null>(null);
 
@@ -125,9 +126,10 @@ export default function AdminPage() {
     <main className="mx-auto w-full max-w-4xl flex-1 space-y-8 px-6 py-12">
       <h1 className="text-2xl font-extrabold tracking-tight">管理后台</h1>
 
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         {(
           [
+            { key: "dashboard", label: "数据看板" },
             { key: "products", label: "商品管理" },
             { key: "orders", label: "订单管理" },
             { key: "users", label: "用户管理" },
@@ -147,6 +149,8 @@ export default function AdminPage() {
           </button>
         ))}
       </div>
+
+      {tab === "dashboard" && <AdminDashboard />}
 
       {tab === "products" && <ProductManager />}
 

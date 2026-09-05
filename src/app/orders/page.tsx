@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { formatPrice } from "@/lib/format";
+import { payableAmount } from "@/types/order";
 import type { ApiResponse } from "@/types/api";
 import { isApiSuccess } from "@/types/api";
 
@@ -19,6 +20,11 @@ type Order = {
   orderNo: string;
   status: string;
   totalAmount: string;
+  discountAmount: string;
+  trackingNo: string | null;
+  refundStatus: string;
+  refundReason: string | null;
+  coupon: { coupon: { title: string; discount: string } } | null;
   createdAt: string;
   items: OrderItem[];
   reviews: { productId: number }[];
@@ -40,9 +46,23 @@ const STATUS_STYLE: Record<string, string> = {
   CANCELLED: "line-through opacity-40",
 };
 
+const REFUND_LABEL: Record<string, string> = {
+  REQUESTED: "退款审核中",
+  REFUNDED: "已退款",
+  REJECTED: "商家拒绝退款",
+};
+
 // 订单可评价条件：已发货/已完成（一单一商品一条）
 function canReview(order: Order): boolean {
   return order.status === "SHIPPED" || order.status === "COMPLETED";
+}
+
+// 可申请退款：支付后（含已完成）、无进行中/已成功的退款
+function canRequestRefund(order: Order): boolean {
+  return (
+    ["PAID", "SHIPPED", "COMPLETED"].includes(order.status) &&
+    ["NONE", "REJECTED"].includes(order.refundStatus)
+  );
 }
 
 function unreviewedItems(order: Order): OrderItem[] {
@@ -96,6 +116,10 @@ export default function OrdersPage() {
   );
   const [reviewForm, setReviewForm] = useState({ rating: 5, content: "" });
 
+  // 退款申请：展开的内联表单（原因），提交后回到列表刷新
+  const [refundTarget, setRefundTarget] = useState<number | null>(null);
+  const [refundReason, setRefundReason] = useState("");
+
   // 查询：单号 / 商品名（客户端过滤，已加载本页订单）
   const filteredOrders = orders.filter((order) => {
     const text = keyword.trim().toLowerCase();
@@ -146,6 +170,23 @@ export default function OrdersPage() {
     await fetch(`/api/orders/${orderId}/cancel`, { method: "POST" });
     await loadOrders(tab);
     setBusyId(null);
+  }
+
+  async function submitRefund(orderId: number) {
+    if (!refundReason.trim()) return;
+    setBusyId(orderId);
+    try {
+      await fetch(`/api/orders/${orderId}/refund`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "request", reason: refundReason.trim() }),
+      });
+      setRefundTarget(null);
+      setRefundReason("");
+      await loadOrders(tab);
+    } finally {
+      setBusyId(null);
+    }
   }
 
   async function submitReview(orderId: number, productId: number) {
@@ -256,7 +297,7 @@ export default function OrdersPage() {
                 key={order.id}
                 className="overflow-hidden rounded-2xl border border-black/10 dark:border-white/15"
               >
-                <div className="flex items-center justify-between bg-mist px-5 py-3 text-xs dark:bg-white/5">
+                <div className="flex flex-wrap items-center justify-between gap-2 bg-mist px-5 py-3 text-xs dark:bg-white/5">
                   <span className="font-mono opacity-70">单号 {order.orderNo}</span>
                   <span className={STATUS_STYLE[order.status] ?? ""}>
                     {STATUS_LABEL[order.status] ?? order.status}
@@ -267,6 +308,30 @@ export default function OrdersPage() {
                     )}
                   </span>
                 </div>
+
+                {/* 退款进度条：申请中 / 已退款 / 被拒 */}
+                {order.refundStatus !== "NONE" && order.refundStatus !== null && (
+                  <div
+                    className={`px-5 py-2 text-xs ${
+                      order.refundStatus === "REJECTED"
+                        ? "bg-promo/10 text-promo"
+                        : "bg-emerald-500/10 text-emerald-600"
+                    }`}
+                  >
+                    {REFUND_LABEL[order.refundStatus] ?? order.refundStatus}
+                    {order.refundReason && (
+                      <span className="ml-2 opacity-70">原因：{order.refundReason}</span>
+                    )}
+                  </div>
+                )}
+
+                {/* 物流信息：发货后展示单号（演示单号 BX 开头） */}
+                {order.trackingNo && order.status === "SHIPPED" && (
+                  <div className="border-b border-black/5 px-5 py-2 text-xs dark:border-white/10">
+                    🚚 物流单号：<span className="font-mono font-semibold">{order.trackingNo}</span>
+                    <span className="ml-2 opacity-50">（演示物流，不提供真实轨迹）</span>
+                  </div>
+                )}
 
                 <ul className="divide-y divide-black/5 dark:divide-white/10">
                   {order.items.map((item) => {
@@ -349,14 +414,26 @@ export default function OrdersPage() {
                   })}
                 </ul>
 
-                <div className="flex items-center justify-between border-t border-black/5 px-5 py-3 dark:border-white/10">
-                  <p className="text-sm">
-                    合计：
-                    <span className="ml-1 font-mono font-bold text-promo">
-                      {formatPrice(order.totalAmount)}
-                    </span>
-                  </p>
-                  <div className="flex gap-2">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-t border-black/5 px-5 py-3 dark:border-white/10">
+                  <div className="text-sm">
+                    {Number(order.discountAmount) > 0 && (
+                      <p className="text-xs opacity-60">
+                        合计 {formatPrice(order.totalAmount)} - 券抵扣
+                        {order.coupon ? `（${order.coupon.coupon.title}）` : ""}
+                        <span className="font-mono text-promo">
+                          {" "}
+                          {formatPrice(order.discountAmount)}
+                        </span>
+                      </p>
+                    )}
+                    <p>
+                      {Number(order.discountAmount) > 0 ? "实付：" : "合计："}
+                      <span className="ml-1 font-mono font-bold text-promo">
+                        {formatPrice(payableAmount(order.totalAmount, order.discountAmount))}
+                      </span>
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
                     {order.status === "PENDING_PAYMENT" && (
                       <>
                         <button
@@ -397,8 +474,39 @@ export default function OrdersPage() {
                         确认收货
                       </button>
                     )}
+                    {canRequestRefund(order) && (
+                      <button
+                        type="button"
+                        onClick={() => setRefundTarget(refundTarget === order.id ? null : order.id)}
+                        className="rounded-full border border-promo/50 px-4 py-1.5 text-xs text-promo transition-colors hover:bg-promo/10 disabled:opacity-40"
+                      >
+                        {refundTarget === order.id ? "收起" : "申请退款"}
+                      </button>
+                    )}
                   </div>
                 </div>
+
+                {/* 内联退款表单：填原因提交，商家在商家中心处理 */}
+                {refundTarget === order.id && canRequestRefund(order) && (
+                  <div className="space-y-2.5 border-t border-black/5 bg-promo/5 px-5 py-3 dark:border-white/10">
+                    <textarea
+                      rows={2}
+                      maxLength={200}
+                      placeholder="请填写退款原因（最多 200 字），如：不想要了 / 商品与描述不符"
+                      value={refundReason}
+                      onChange={(e) => setRefundReason(e.target.value)}
+                      className={inputClass}
+                    />
+                    <button
+                      type="button"
+                      disabled={busyId === order.id || !refundReason.trim()}
+                      onClick={() => submitRefund(order.id)}
+                      className="rounded-full bg-promo px-6 py-1.5 text-xs font-medium text-white disabled:opacity-40"
+                    >
+                      提交退款申请
+                    </button>
+                  </div>
+                )}
               </li>
             );
           })}

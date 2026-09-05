@@ -98,12 +98,63 @@ body {
   border-top: 2px dashed rgba(20, 33, 61, 0.12);
 }
 
+/* toast 浮出动画 */
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.toast-in {
+  animation: toast-in 0.22s ease-out;
+}
+
+/* 骨架屏脉冲占位 */
+.skeleton {
+  border-radius: 0.75rem;
+  background: linear-gradient(
+    100deg,
+    rgba(20, 33, 61, 0.06) 40%,
+    rgba(20, 33, 61, 0.12) 50%,
+    rgba(20, 33, 61, 0.06) 60%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-wave 1.4s ease infinite;
+}
+
+@keyframes skeleton-wave {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  .skeleton {
+    background: linear-gradient(
+      100deg,
+      rgba(255, 255, 255, 0.06) 40%,
+      rgba(255, 255, 255, 0.12) 50%,
+      rgba(255, 255, 255, 0.06) 60%
+    );
+    background-size: 200% 100%;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .hover-lift {
     transition: none !important;
     transform: none !important;
   }
   .marquee-track {
+    animation: none !important;
+  }
+  .toast-in,
+  .skeleton {
     animation: none !important;
   }
 }

@@ -17,6 +17,16 @@ type CartData = { items: CartItem[]; totalQuantity: number; totalPrice: number }
 
 type OrderCreated = { id: number; orderNo: string };
 
+// 结算可用券：UNUSED 且未过期、满足门槛；一单限用一张
+type MyCoupon = {
+  id: number;
+  status: "UNUSED" | "USED";
+  expired: boolean;
+  title: string;
+  threshold: string;
+  discount: string;
+};
+
 // 结算页：提交时携带幂等键（本页生命周期内固定，失败重试复用同一 key，防止重复下单）
 export default function CheckoutPage() {
   const router = useRouter();
@@ -36,6 +46,10 @@ export default function CheckoutPage() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  // 优惠券：可用券下拉挑选，选中的随订单提交核销
+  const [usableCoupons, setUsableCoupons] = useState<MyCoupon[]>([]);
+  const [selectedCouponId, setSelectedCouponId] = useState<string>("");
 
   // 地址簿：登录后加载，默认地址自动填入收货信息
   type AddressOption = {
@@ -103,6 +117,24 @@ export default function CheckoutPage() {
     })();
   }, [status]);
 
+  // 可用优惠券：未使用、未过期、门槛 ≤ 当前合计（合计变化后自动重新计算，超门槛的置灰提示）
+  useEffect(() => {
+    if (status !== "ready") return;
+    void (async () => {
+      const res = await fetch("/api/coupons/mine");
+      const result = (await res.json()) as ApiResponse<MyCoupon[]>;
+      if (!isApiSuccess(result)) return;
+      setUsableCoupons(
+        result.data.filter(
+          (coupon) =>
+            coupon.status === "UNUSED" &&
+            !coupon.expired &&
+            Number(coupon.threshold) <= cart!.totalPrice,
+        ),
+      );
+    })();
+  }, [status, cart]);
+
   function update(field: keyof typeof form) {
     return (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
       setForm((prev) => ({ ...prev, [field]: e.target.value }));
@@ -121,7 +153,10 @@ export default function CheckoutPage() {
           "Content-Type": "application/json",
           "Idempotency-Key": getIdempotencyKey(),
         },
-        body: JSON.stringify(form),
+        body: JSON.stringify({
+          ...form,
+          ...(selectedCouponId ? { userCouponId: Number(selectedCouponId) } : {}),
+        }),
       });
       const result = (await res.json()) as ApiResponse<OrderCreated>;
 
@@ -278,12 +313,68 @@ export default function CheckoutPage() {
           )}
         </div>
 
+        {/* 优惠券选择：一单一张，门槛由服务端二次校验 */}
+        <div>
+          <label className="mb-1 block text-sm opacity-70" htmlFor="coupon">
+            优惠券
+          </label>
+          <select
+            id="coupon"
+            value={selectedCouponId}
+            onChange={(e) => setSelectedCouponId(e.target.value)}
+            className={inputClass}
+          >
+            <option value="">不使用优惠券</option>
+            {usableCoupons.map((coupon) => (
+              <option key={coupon.id} value={coupon.id}>
+                {coupon.title}（立减 {formatPrice(Number(coupon.discount))}）
+              </option>
+            ))}
+          </select>
+          {usableCoupons.length === 0 && (
+            <p className="mt-1 text-xs opacity-50">
+              没有满足门槛的可用券，可去
+              <Link href="/coupons" className="text-promo hover:underline">
+                领券中心
+              </Link>
+              逛逛
+            </p>
+          )}
+        </div>
+
         <div className="flex items-center justify-between rounded-lg bg-mist px-4 py-3 dark:bg-white/5">
+          <p className="text-sm opacity-70">共 {cart.totalQuantity} 件</p>
           <p className="text-sm opacity-70">
-            共 {cart.totalQuantity} 件，应付：
-            <span className="ml-1 font-mono text-xl font-bold text-promo">
-              {formatPrice(cart.totalPrice)}
-            </span>
+            商品合计：
+            <span className="font-mono">{formatPrice(cart.totalPrice)}</span>
+            {selectedCouponId && (
+              <>
+                <span className="mx-2">-</span>
+                <span className="font-mono text-promo">
+                  券抵{" "}
+                  {formatPrice(
+                    Number(
+                      usableCoupons.find((c) => String(c.id) === selectedCouponId)?.discount ?? 0,
+                    ),
+                  )}
+                </span>
+              </>
+            )}
+          </p>
+        </div>
+
+        <div className="flex items-center justify-end gap-3">
+          <p className="text-sm opacity-70">应付：</p>
+          <p className="font-mono text-2xl font-bold text-promo">
+            {formatPrice(
+              Math.max(
+                0,
+                cart.totalPrice -
+                  Number(
+                    usableCoupons.find((c) => String(c.id) === selectedCouponId)?.discount ?? 0,
+                  ),
+              ),
+            )}
           </p>
         </div>
 
@@ -294,7 +385,7 @@ export default function CheckoutPage() {
           disabled={submitting}
           className="w-full rounded-full bg-promo py-3 font-medium text-white transition-colors hover:bg-promo-deep disabled:opacity-50"
         >
-          {submitting ? "提交中…" : "提交订单（暂不付款）"}
+          {submitting ? "提交中…" : "提交订单（演示环境暂不付款）"}
         </button>
       </form>
     </main>

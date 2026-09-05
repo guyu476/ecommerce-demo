@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Geist, Geist_Mono } from "next/font/google";
+import { MobileNav } from "@/components/mobile-nav";
+import { ToastProvider } from "@/components/toast";
 import { UserNav } from "@/components/user-nav";
 import "./globals.css";
 
@@ -49,38 +51,47 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="zh-CN" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col">
-        {/* 促销跑马灯 */}
-        <div className="overflow-hidden bg-promo text-white" aria-hidden>
-          <div className="marquee-track flex w-max gap-10 py-1.5 text-xs whitespace-nowrap">
-            {marqueeItems.map((promo, i) => (
-              <span key={i} className="tracking-wider">
-                {promo}
-              </span>
-            ))}
+        <ToastProvider>
+          {/* 促销跑马灯 */}
+          <div className="overflow-hidden bg-promo text-white" aria-hidden>
+            <div className="marquee-track flex w-max gap-10 py-1.5 text-xs whitespace-nowrap">
+              {marqueeItems.map((promo, i) => (
+                <span key={i} className="tracking-wider">
+                  {promo}
+                </span>
+              ))}
+            </div>
           </div>
-        </div>
 
-        {/* 非悬浮头部：滚动时不遮挡页面内容 */}
-        <header className="bg-ink text-white">
-          <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-6">
-            <Link href="/" className="flex items-center gap-3">
-              <BirdMark />
-              <span className="text-xl font-bold tracking-tight">鸟西商城</span>
-            </Link>
-            <nav className="flex items-center gap-6 text-sm">
-              <Link href="/" className="hover:opacity-70">
-                首页
+          {/* 非悬浮头部：滚动时不遮挡页面内容 */}
+          <header className="bg-ink text-white">
+            <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-4 sm:px-6">
+              <Link href="/" className="flex items-center gap-3">
+                <BirdMark />
+                <span className="text-xl font-bold tracking-tight">鸟西商城</span>
               </Link>
-              <UserNav />
-            </nav>
-          </div>
-        </header>
+              <div className="flex items-center gap-3">
+                {/* 桌面端常驻导航；移动端收进汉堡菜单 */}
+                <nav className="hidden items-center gap-6 text-sm sm:flex">
+                  <Link href="/" className="hover:opacity-70">
+                    首页
+                  </Link>
+                  <Link href="/coupons" className="hover:opacity-70">
+                    领券中心
+                  </Link>
+                  <UserNav />
+                </nav>
+                <MobileNav />
+              </div>
+            </div>
+          </header>
 
-        {children}
+          {children}
 
-        <footer className="bg-mist py-10 text-center text-xs opacity-60 dark:bg-white/5">
-          鸟西商城 · Next.js 全栈演示项目
-        </footer>
+          <footer className="bg-mist py-10 text-center text-xs opacity-60 dark:bg-white/5">
+            鸟西商城 · Next.js 全栈演示项目
+          </footer>
+        </ToastProvider>
       </body>
     </html>
   );
