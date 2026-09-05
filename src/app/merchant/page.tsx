@@ -97,10 +97,21 @@ export default function MerchantPage() {
       <ShopSettings />
       <MerchantCoupons />
       <ProductManager />
-      <section className="space-y-4">
-        <h2 className="text-lg font-extrabold tracking-tight">订单发货</h2>
-        <OrderManager role={me?.role === "ADMIN" ? "ADMIN" : "MERCHANT"} />
-      </section>
+      {/* 订单发货只属于商家视角；管理员的全平台订单监督在 /admin 订单管理 */}
+      {me?.role === "MERCHANT" ? (
+        <section className="space-y-4">
+          <h2 className="text-lg font-extrabold tracking-tight">订单发货</h2>
+          <OrderManager role="MERCHANT" />
+        </section>
+      ) : (
+        <p className="rounded-xl border border-dashed border-black/15 px-6 py-5 text-sm opacity-60 dark:border-white/20">
+          管理员不参与发货；全平台订单请在{" "}
+          <Link href="/admin" className="text-promo hover:underline">
+            管理后台 → 订单管理
+          </Link>{" "}
+          查看（只读监督）
+        </p>
+      )}
     </main>
   );
 }
