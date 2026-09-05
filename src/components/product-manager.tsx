@@ -8,6 +8,7 @@ import { isApiSuccess } from "@/types/api";
 type Product = {
   id: number;
   name: string;
+  description: string | null;
   price: string;
   stock: number;
   sales: number;
@@ -148,7 +149,7 @@ export function ProductManager() {
       price: product.price,
       stock: String(product.stock),
       categoryId: String(product.categoryId),
-      description: "",
+      description: product.description ?? "",
       status: product.status,
     });
     setFormImages(parseImages(product.images));

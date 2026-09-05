@@ -106,6 +106,8 @@ model Product {
   stock       Int           @default(0)
   sales       Int           @default(0)
   status      ProductStatus @default(DRAFT)
+  // 种子幂等键：seed 数据按此键去重（商品名可被商家修改，不能当幂等键）
+  seedKey     String?       @unique @map("seed_key") @db.VarChar(40)
   categoryId  Int?
   category    Category?     @relation(fields: [categoryId], references: [id])
   sellerId    Int?          @map("seller_id")

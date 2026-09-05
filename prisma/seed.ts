@@ -182,32 +182,53 @@ async function main() {
     categoryMap.set(category.slug, record.id);
   }
 
-  // 商品按名称幂等写入（已存在但缺商家的补齐，不重复堆积）
+  // 商品按 seedKey 幂等写入：商品名可被商家修改，不能当幂等键（改名后再跑 seed 不复活旧名、不造重复行）
+  // 已存在的行只回填商家/店铺归属，不覆盖名字、图片、价格等商家可编辑字段
   // 商品图片一律由商家上传，种子数据不生成图片
   let created = 0;
-  const productIdByName = new Map<string, number>();
-  for (const product of products) {
+  const productIdByIndex = new Map<number, number>();
+  // 全新空库直接全量创建；已有数据的库里认领不到的槽位视为「被商家改名/删除」，跳过不复活
+  const existingProductCount = await prisma.product.count();
+  for (const [index, product] of products.entries()) {
+    const seedKey = `seed-p${index + 1}`;
     const sellerId =
       product.categorySlug === "digital" || product.categorySlug === "computer"
         ? merchantUser.id
         : null;
-    const existing = await prisma.product.findFirst({
-      where: { name: product.name },
-    });
-    if (existing) {
-      productIdByName.set(product.name, existing.id);
-      const shopId = sellerId !== null ? demoShop.id : null;
-      if (existing.sellerId === null && sellerId !== null) {
-        await prisma.product.update({
-          where: { id: existing.id },
-          data: { sellerId, shopId },
+    const shopId = sellerId !== null ? demoShop.id : null;
+
+    let record = await prisma.product.findUnique({ where: { seedKey } });
+    if (!record) {
+      // 历史库兼容：老库的种子行没有 seedKey，按名字认领一次。
+      // 认领不到：空库则走下方新建；已有数据的库则视为被商家改名/删除，跳过不复活
+      const byName = await prisma.product.findFirst({
+        where: { name: product.name, seedKey: null },
+      });
+      if (byName) {
+        record = await prisma.product.update({
+          where: { id: byName.id },
+          data: { seedKey },
         });
-      } else if (sellerId !== null && existing.shopId === null) {
-        await prisma.product.update({ where: { id: existing.id }, data: { shopId } });
+      } else if (existingProductCount > 0) {
+        console.warn(
+          `跳过种子商品「${product.name}」：库中已有数据且找不到可认领的行（可能已被改名或删除）`,
+        );
+        continue;
+      }
+    }
+
+    if (record) {
+      productIdByIndex.set(index, record.id);
+      const patch: { sellerId?: number; shopId?: number } = {};
+      if (record.sellerId === null && sellerId !== null) patch.sellerId = sellerId;
+      if (record.shopId === null && shopId !== null) patch.shopId = shopId;
+      if (Object.keys(patch).length > 0) {
+        await prisma.product.update({ where: { id: record.id }, data: patch });
       }
       continue;
     }
-    const record = await prisma.product.create({
+
+    const newRecord = await prisma.product.create({
       data: {
         name: product.name,
         description: product.description,
@@ -217,17 +238,18 @@ async function main() {
         status: ProductStatus.ON_SALE,
         categoryId: categoryMap.get(product.categorySlug),
         sellerId,
-        shopId: sellerId !== null ? demoShop.id : null,
+        shopId,
+        seedKey,
       },
     });
-    productIdByName.set(product.name, record.id);
+    productIdByIndex.set(index, newRecord.id);
     created += 1;
   }
 
-  // 演示订单 1：已完成（带评价）——幂等按 orderNo
+  // 演示订单 1：已完成（带评价）——幂等按 orderNo；商品按种子下标取 id（不依赖名字，改名不影响）
   const completedItems = [
-    { name: "降噪无线蓝牙耳机 AirPro 3", price: 699, quantity: 1 },
-    { name: "氨基酸保湿洁面乳 150ml", price: 79, quantity: 2 },
+    { productIndex: 1, name: "降噪无线蓝牙耳机 AirPro 3", price: 699, quantity: 1 },
+    { productIndex: 10, name: "氨基酸保湿洁面乳 150ml", price: 79, quantity: 2 },
   ];
   const completedOrder = await prisma.order.upsert({
     where: { orderNo: "DEMO202609010001" },
@@ -242,7 +264,7 @@ async function main() {
       shippingAddress: "浙江省杭州市西湖区文三路 100 号",
       items: {
         create: completedItems.map((item) => ({
-          productId: productIdByName.get(item.name)!,
+          productId: productIdByIndex.get(item.productIndex)!,
           name: item.name,
           price: item.price,
           quantity: item.quantity,
@@ -284,8 +306,8 @@ async function main() {
     }
   }
 
-  // 演示订单 2：已发货（带物流单号，待评价，给「待评价」入口留演示数据）
-  const shippedProduct = "机械键盘 87 键 红轴";
+  // 演示订单 2：已发货（带物流单号，待评价，给「待评价」入口留演示数据）；商品取种子下标 4（机械键盘）
+  const shippedProduct = { productIndex: 4, name: "机械键盘 87 键 红轴" };
   await prisma.order.upsert({
     where: { orderNo: "DEMO202609010002" },
     update: {},
@@ -302,8 +324,8 @@ async function main() {
       items: {
         create: [
           {
-            productId: productIdByName.get(shippedProduct)!,
-            name: shippedProduct,
+            productId: productIdByIndex.get(shippedProduct.productIndex)!,
+            name: shippedProduct.name,
             price: 329,
             quantity: 1,
           },
