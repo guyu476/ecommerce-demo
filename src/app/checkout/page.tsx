@@ -10,14 +10,20 @@ import { isApiSuccess } from "@/types/api";
 type CartItem = {
   id: number;
   quantity: number;
-  product: { id: number; name: string; price: string; category: { icon: string | null } | null };
+  product: {
+    id: number;
+    name: string;
+    price: string;
+    sellerId: number | null;
+    category: { icon: string | null } | null;
+  };
 };
 
 type CartData = { items: CartItem[]; totalQuantity: number; totalPrice: number };
 
 type OrderCreated = { id: number; orderNo: string };
 
-// 结算可用券：UNUSED 且未过期、满足门槛；一单限用一张
+// 结算可用券：UNUSED 且未过期；平台券按整单门槛，店铺券按该店商品小计门槛（一单限用一张）
 type MyCoupon = {
   id: number;
   status: "UNUSED" | "USED";
@@ -25,6 +31,9 @@ type MyCoupon = {
   title: string;
   threshold: string;
   discount: string;
+  scope: "platform" | "shop";
+  ownerUserId: number | null;
+  scopeLabel: string;
 };
 
 // 结算页：提交时携带幂等键（本页生命周期内固定，失败重试复用同一 key，防止重复下单）
@@ -117,20 +126,32 @@ export default function CheckoutPage() {
     })();
   }, [status]);
 
-  // 可用优惠券：未使用、未过期、门槛 ≤ 当前合计（合计变化后自动重新计算，超门槛的置灰提示）
+  // 可用优惠券：未使用、未过期；平台券门槛 ≤ 整单合计，店铺券门槛 ≤ 该店商品小计（与服务端同口径预判）
   useEffect(() => {
     if (status !== "ready") return;
     void (async () => {
       const res = await fetch("/api/coupons/mine");
       const result = (await res.json()) as ApiResponse<MyCoupon[]>;
       if (!isApiSuccess(result)) return;
+
+      const shopSubtotals = new Map<number, number>();
+      for (const item of cart!.items) {
+        if (item.product.sellerId == null) continue;
+        shopSubtotals.set(
+          item.product.sellerId,
+          (shopSubtotals.get(item.product.sellerId) ?? 0) +
+            Number(item.product.price) * item.quantity,
+        );
+      }
+
       setUsableCoupons(
-        result.data.filter(
-          (coupon) =>
-            coupon.status === "UNUSED" &&
-            !coupon.expired &&
-            Number(coupon.threshold) <= cart!.totalPrice,
-        ),
+        result.data.filter((coupon) => {
+          if (coupon.status !== "UNUSED" || coupon.expired) return false;
+          const threshold = Number(coupon.threshold);
+          if (coupon.scope === "platform") return threshold <= cart!.totalPrice;
+          const shopSubtotal = shopSubtotals.get(coupon.ownerUserId ?? 0) ?? 0;
+          return shopSubtotal > 0 && threshold <= shopSubtotal;
+        }),
       );
     })();
   }, [status, cart]);
@@ -327,6 +348,7 @@ export default function CheckoutPage() {
             <option value="">不使用优惠券</option>
             {usableCoupons.map((coupon) => (
               <option key={coupon.id} value={coupon.id}>
+                {coupon.scope === "shop" && `[${coupon.scopeLabel}] `}
                 {coupon.title}（立减 {formatPrice(Number(coupon.discount))}）
               </option>
             ))}

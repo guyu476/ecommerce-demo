@@ -44,11 +44,12 @@ npm run dev              # 启动开发服务器，打开 http://localhost:3000
 
 ## 演示账号
 
-| 角色   | 账号                 | 密码           |
-| ------ | -------------------- | -------------- |
-| 用户   | demo@example.com     | demo123456     |
-| 商家   | merchant@example.com | merchant123456 |
-| 管理员 | admin@example.com    | admin123456    |
+| 角色         | 账号                  | 密码           | 店铺                                      |
+| ------------ | --------------------- | -------------- | ----------------------------------------- |
+| 用户         | demo@example.com      | demo123456     | —                                         |
+| 商家（一店） | merchant@example.com  | merchant123456 | 鸟西数码旗舰店（手机数码 / 电脑办公）     |
+| 商家（二店） | merchant2@example.com | merchant123456 | 优选生活百货（家电 / 服饰 / 美妆 / 生鲜） |
+| 管理员       | admin@example.com     | admin123456    | —                                         |
 
 短信登录 / 找回密码：任意合法手机号 + 任意 6 位验证码（演示环境不校验；短信登录时未注册手机号会自动建号）。
 
@@ -58,13 +59,14 @@ npm run dev              # 启动开发服务器，打开 http://localhost:3000
 
 - 商城首页：搜索（名称/描述）、排序（综合/最新/价格升降）、分类票签筛选、热卖轮播、分页、领券条幅
 - 商品详情：多图画廊 + 灯箱、评分与评价列表、加入购物车、收藏心形、进店逛逛
-- 购物车 → 结算：地址簿预填、**优惠券抵扣**（满减门槛服务端二次校验）、幂等键防重复下单
+- 购物车 → 结算：地址簿预填、**优惠券抵扣**（平台券整单满减、店铺券按该店商品小计满减，服务端二次校验）、幂等键防重复下单
 - 订单：模拟支付、查看物流单号、确认收货、**申请退款（售后）**、评价（星级 + 文字）、五入口红点计数
 - 个人中心：昵称/头像、收货地址簿、我的收藏、领券中心（领券 + 我的券）
 
 **商家侧**（商家中心 `/merchant`）
 
 - 店铺设置（一人一店）：店名 / 店招 emoji / 简介，公开店铺主页 `/shops/[id]`
+- **发店铺券**：自定门槛/面额/数量/有效期，限本店商品满减；领取进度条、未领取可撤下
 - 商品管理：上架 / 下架 / 草稿、多图上传（`/api/upload`，客户端压缩后存站点文件）
 - 订单发货：填写物流单号（留空自动生成演示单号）
 - 退款处理：同意退款（模拟打款、回补库存、订单取消）或拒绝
@@ -72,6 +74,7 @@ npm run dev              # 启动开发服务器，打开 http://localhost:3000
 **管理侧**（后台 `/admin`）
 
 - 数据看板：GMV（实付口径）、近 7 天订单趋势、状态分布、热卖 TOP 5、待发货 / 退款待处理告警
+- **发平台券**：全店通用；可查看全平台券（平台券/店铺券标识与领取进度）、撤下未领取的券
 - 商品 / 订单管理（只读监督）、用户角色管理
 
 **工程质量**
@@ -103,7 +106,7 @@ npm run dev              # 启动开发服务器，打开 http://localhost:3000
 
 ## 数据模型（prisma/schema.prisma）
 
-`User`（三角色）、`Address`、`CartItem`、`Category`、`Product`（挂 `sellerId` 与 `shopId`）、`Shop`（一人一店）、`Favorite`、`Coupon` / `UserCoupon`（每人限领一张、一单至多用一张）、`Order`（含退款状态/原因/金额、物流单号、支付/发货/收货时间、券抵扣金额）、`OrderItem`（下单快照）、`Review`（一单一商品一条）、`IdempotencyKey`。
+`User`（三角色）、`Address`、`CartItem`、`Category`、`Product`（挂 `sellerId` 与 `shopId`，带 `seedKey` 种子幂等键）、`Shop`（一人一店）、`Favorite`、`Coupon`（发券方 `ownerId`：空 = 平台券，非空 = 店铺券）/ `UserCoupon`（每人限领一张、一单至多用一张）、`Order`（含退款状态/原因/金额、物流单号、支付/发货/收货时间、券抵扣金额）、`OrderItem`（下单快照）、`Review`（一单一商品一条）、`IdempotencyKey`。
 
 ## 目录结构
 
@@ -145,7 +148,9 @@ scripts/                    # 绑图 / 重置演示订单 / 清理测试账号
 | GET `/api/products`                                                           | 商品分页：keyword（名称/描述）、sort、categoryId、status |
 | GET/POST `/api/cart`，PATCH/DELETE `/api/cart/[id]`                           | 购物车                                                   |
 | GET/POST `/api/favorites`，DELETE `?productId=`，GET `/api/favorites/ids`     | 收藏列表 / 收藏 / 取消 / 心形状态                        |
-| GET `/api/coupons`，POST（领取），GET `/api/coupons/mine`                     | 券模板 / 领取 / 我的券                                   |
+| GET `/api/coupons`，POST（领取），GET `/api/coupons/mine`                     | 券模板（含平台券/店铺券标识）/ 领取 / 我的券             |
+| GET/POST `/api/merchant/coupons`，DELETE `/api/merchant/coupons/[id]`         | 店铺券管理（商家发券，限本店商品满减；未领取可撤）       |
+| GET/POST `/api/admin/coupons`，DELETE `/api/admin/coupons/[id]`               | 平台券管理（管理员发券，全店通用；未领取可撤）           |
 | POST `/api/orders`（Idempotency-Key + 可选 userCouponId）、GET                | 下单（券抵扣）/ 订单分页                                 |
 | GET `/api/orders/[id]`、GET `/api/orders/counts`                              | 订单详情 / 各状态计数                                    |
 | POST `/api/orders/[id]/transition`                                            | pay / ship（可带单号）/ confirm                          |

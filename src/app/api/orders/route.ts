@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
           });
         }
 
-        // 4. 优惠券核销：UNUSED + 未过期 + 满门槛，任一不满足则整体回滚
+        // 4. 优惠券核销：UNUSED + 未过期 + 满门槛（平台券按整单合计，店铺券按该店商品小计），任一不满足整体回滚
         const totalAmount = snapshots.reduce(
           (sum, item) => sum + Number(item.price) * item.quantity,
           0,
@@ -88,12 +88,27 @@ export async function POST(request: NextRequest) {
           if (userCoupon.coupon.expiresAt < new Date()) {
             throw new ApiError("优惠券已过期", 40906, 409);
           }
-          if (Number(userCoupon.coupon.threshold) > totalAmount) {
-            throw new ApiError(
-              `该券满 ${Number(userCoupon.coupon.threshold)} 元可用，还差一点哦`,
-              40906,
-              409,
-            );
+          const threshold = Number(userCoupon.coupon.threshold);
+          if (userCoupon.coupon.ownerId === null) {
+            // 平台券：整单满减
+            if (threshold > totalAmount) {
+              throw new ApiError(`该券满 ${threshold} 元可用，还差一点哦`, 40906, 409);
+            }
+          } else {
+            // 店铺券：该商家店铺商品的订单小计满减（跨店混购时只算本店部分）
+            const shopSubtotal = cartItems
+              .filter((item) => item.product.sellerId === userCoupon.coupon.ownerId)
+              .reduce((sum, item) => sum + Number(item.product.price) * item.quantity, 0);
+            if (shopSubtotal === 0) {
+              throw new ApiError("该券是店铺券，购物车里没有这个店铺的商品", 40906, 409);
+            }
+            if (threshold > shopSubtotal) {
+              throw new ApiError(
+                `该券限店铺商品满 ${threshold} 元可用（当前本店小计 ${shopSubtotal.toFixed(2)} 元）`,
+                40906,
+                409,
+              );
+            }
           }
           const claimed = await tx.userCoupon.updateMany({
             where: { id: userCoupon.id, status: "UNUSED" },

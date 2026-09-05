@@ -34,9 +34,10 @@ model User {
   reviews      Review[]
   addresses    Address[]
   products     Product[]
-  shops        Shop[]
+  shop         Shop?
   favorites    Favorite[]
   userCoupons  UserCoupon[]
+  issuedCoupons Coupon[]
 
   @@map("users")
 }
@@ -278,6 +279,7 @@ enum CouponStatus {
 }
 
 // 券模板：满 threshold 减 discount，限领一张（totalCount 用完即止，条件更新防超发）
+// 发券方：ownerId 为空 = 平台券（管理员发，全店通用）；非空 = 店铺券（商家发，限该商家店铺商品满减）
 model Coupon {
   id           Int          @id @default(autoincrement())
   title        String       @db.VarChar(100)
@@ -286,9 +288,12 @@ model Coupon {
   totalCount   Int          @map("total_count")
   claimedCount Int          @default(0) @map("claimed_count")
   expiresAt    DateTime     @map("expires_at")
+  ownerId      Int?         @map("owner_id")
+  owner        User?        @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   createdAt    DateTime     @default(now()) @map("created_at")
   userCoupons  UserCoupon[]
 
+  @@index([ownerId])
   @@map("coupons")
 }
 

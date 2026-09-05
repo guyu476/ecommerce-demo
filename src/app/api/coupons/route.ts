@@ -16,7 +16,12 @@ export async function GET() {
     const user = await getSessionUser();
 
     const [coupons, myClaimedCouponIds] = await Promise.all([
-      prisma.coupon.findMany({ orderBy: { id: "asc" } }),
+      prisma.coupon.findMany({
+        orderBy: { id: "asc" },
+        include: {
+          owner: { select: { nickname: true, shop: { select: { id: true, name: true } } } },
+        },
+      }),
       user
         ? prisma.userCoupon.findMany({ where: { userId: user.id }, select: { couponId: true } })
         : Promise.resolve([]),
@@ -33,6 +38,13 @@ export async function GET() {
         remaining: Math.max(0, coupon.totalCount - coupon.claimedCount),
         expired: coupon.expiresAt < now,
         claimed: claimedSet.has(coupon.id),
+        // 发券方：平台券全店通用；店铺券限该店商品满减
+        scope: coupon.ownerId === null ? "platform" : "shop",
+        scopeLabel:
+          coupon.ownerId === null
+            ? "平台券"
+            : (coupon.owner?.shop?.name ?? coupon.owner?.nickname ?? "店铺券"),
+        shopId: coupon.owner?.shop?.id ?? null,
       })),
     );
   });

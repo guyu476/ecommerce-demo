@@ -14,6 +14,9 @@ type CouponTemplate = {
   remaining: number;
   expired: boolean;
   claimed: boolean;
+  scope: "platform" | "shop";
+  scopeLabel: string;
+  shopId: number | null;
 };
 
 type MyCoupon = {
@@ -24,6 +27,8 @@ type MyCoupon = {
   threshold: string;
   discount: string;
   expiresAt: string;
+  scope: "platform" | "shop";
+  scopeLabel: string;
 };
 
 // 领券中心：上半区抢券（票根墙），下半区我的券（未使用/已使用）
@@ -93,6 +98,8 @@ export default function CouponsPage() {
     threshold,
     discount,
     footer,
+    scope,
+    scopeLabel,
     muted,
     action,
   }: {
@@ -100,6 +107,8 @@ export default function CouponsPage() {
     threshold: string;
     discount: string;
     footer: string;
+    scope?: "platform" | "shop";
+    scopeLabel?: string;
     muted?: boolean;
     action?: React.ReactNode;
   }) {
@@ -125,7 +134,18 @@ export default function CouponsPage() {
           </span>
         </span>
         <span className="coupon-dash flex min-w-0 flex-1 flex-col justify-center gap-1 px-4 py-3">
-          <span className="truncate text-sm font-semibold">{title}</span>
+          <span className="flex items-center gap-2">
+            {scope && (
+              <span
+                className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium ${
+                  scope === "platform" ? "bg-ink text-white" : "bg-market text-ink"
+                }`}
+              >
+                {scope === "platform" ? "平台券" : (scopeLabel ?? "店铺券")}
+              </span>
+            )}
+            <span className="truncate text-sm font-semibold">{title}</span>
+          </span>
           <span className="truncate text-xs opacity-55">{footer}</span>
           {action && <span className="mt-1">{action}</span>}
         </span>
@@ -159,7 +179,12 @@ export default function CouponsPage() {
                 title={coupon.title}
                 threshold={coupon.threshold}
                 discount={coupon.discount}
-                footer={coupon.expired ? "已过期" : `仅剩 ${coupon.remaining} 张`}
+                scope={coupon.scope}
+                scopeLabel={coupon.scopeLabel}
+                footer={
+                  (coupon.expired ? "已过期" : `仅剩 ${coupon.remaining} 张`) +
+                  (coupon.scope === "shop" ? " · 限该店商品满减" : " · 全店通用")
+                }
                 muted={coupon.expired || (coupon.claimed && coupon.remaining === 0)}
                 action={
                   coupon.expired ? (
@@ -230,6 +255,8 @@ export default function CouponsPage() {
                     title={coupon.title}
                     threshold={coupon.threshold}
                     discount={coupon.discount}
+                    scope={coupon.scope}
+                    scopeLabel={coupon.scopeLabel}
                     muted={coupon.status === "USED" || coupon.expired}
                     footer={
                       coupon.status === "USED"

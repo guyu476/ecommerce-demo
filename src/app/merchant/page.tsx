@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { MerchantCoupons } from "@/components/merchant-coupons";
 import { OrderManager } from "@/components/order-manager";
 import { ProductManager } from "@/components/product-manager";
 import { ShopSettings } from "@/components/shop-settings";
@@ -94,6 +95,7 @@ export default function MerchantPage() {
       </div>
 
       <ShopSettings />
+      <MerchantCoupons />
       <ProductManager />
       <section className="space-y-4">
         <h2 className="text-lg font-extrabold tracking-tight">订单发货</h2>

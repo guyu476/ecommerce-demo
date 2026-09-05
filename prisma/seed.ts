@@ -171,6 +171,29 @@ async function main() {
     },
   });
 
+  // 商家账号 2：merchant2@example.com / merchant123456（平台是多家店，不是一家超市）
+  const merchant2User = await prisma.user.upsert({
+    where: { email: "merchant2@example.com" },
+    update: {},
+    create: {
+      email: "merchant2@example.com",
+      nickname: "优选生活百货",
+      role: "MERCHANT",
+      passwordHash: await bcrypt.hash("merchant123456", 10),
+    },
+  });
+
+  const demoShop2 = await prisma.shop.upsert({
+    where: { ownerId: merchant2User.id },
+    update: { name: "优选生活百货", logo: "🏬" },
+    create: {
+      ownerId: merchant2User.id,
+      name: "优选生活百货",
+      logo: "🏬",
+      description: "家电、服饰、美妆、生鲜一站买齐，自营严选，次日送达。",
+    },
+  });
+
   // 分类按 slug 幂等写入
   const categoryMap = new Map<string, number>();
   for (const category of categories) {
@@ -191,11 +214,10 @@ async function main() {
   const existingProductCount = await prisma.product.count();
   for (const [index, product] of products.entries()) {
     const seedKey = `seed-p${index + 1}`;
-    const sellerId =
-      product.categorySlug === "digital" || product.categorySlug === "computer"
-        ? merchantUser.id
-        : null;
-    const shopId = sellerId !== null ? demoShop.id : null;
+    // 平台是多家店：手机数码/电脑办公归一店，其余品类归二店（生活百货）
+    const isDigital = product.categorySlug === "digital" || product.categorySlug === "computer";
+    const sellerId = isDigital ? merchantUser.id : merchant2User.id;
+    const shopId = isDigital ? demoShop.id : demoShop2.id;
 
     let record = await prisma.product.findUnique({ where: { seedKey } });
     if (!record) {
@@ -334,13 +356,33 @@ async function main() {
     },
   });
 
-  // 演示优惠券：未过期满减券两张（幂等按 title；每人限领一张由业务约束保证）
+  // 演示优惠券：三张平台券（管理员发，全店通用）+ 一张店铺券（二店发，限该店商品满减）
+  // 幂等按 title；每人限领一张由业务约束保证
   const nextYear = new Date();
   nextYear.setFullYear(nextYear.getFullYear() + 1);
-  const couponSpecs = [
-    { title: "新人专享满 99 减 20", threshold: 99, discount: 20, totalCount: 1000 },
-    { title: "数码狂嗨满 1000 减 120", threshold: 1000, discount: 120, totalCount: 200 },
-    { title: "周末加餐满 200 减 30", threshold: 200, discount: 30, totalCount: 500 },
+  const couponSpecs: {
+    title: string;
+    threshold: number;
+    discount: number;
+    totalCount: number;
+    ownerId: number | null;
+  }[] = [
+    { title: "新人专享满 99 减 20", threshold: 99, discount: 20, totalCount: 1000, ownerId: null },
+    {
+      title: "数码狂嗨满 1000 减 120",
+      threshold: 1000,
+      discount: 120,
+      totalCount: 200,
+      ownerId: null,
+    },
+    { title: "周末加餐满 200 减 30", threshold: 200, discount: 30, totalCount: 500, ownerId: null },
+    {
+      title: "优选生活百货 满 100 减 15",
+      threshold: 100,
+      discount: 15,
+      totalCount: 300,
+      ownerId: merchant2User.id,
+    },
   ];
   for (const spec of couponSpecs) {
     const existing = await prisma.coupon.findFirst({ where: { title: spec.title } });
@@ -352,13 +394,14 @@ async function main() {
           discount: spec.discount,
           totalCount: spec.totalCount,
           expiresAt: nextYear,
+          ownerId: spec.ownerId,
         },
       });
     }
   }
 
   console.log(
-    `种子数据完成：分类 ${categories.length} 个，新写入商品 ${created} 个（共 ${products.length} 条），演示订单 2 笔 + 评价 2 条，店铺 1 家（${demoShop.name}），优惠券 ${couponSpecs.length} 张`,
+    `种子数据完成：分类 ${categories.length} 个，新写入商品 ${created} 个（共 ${products.length} 条），演示订单 2 笔 + 评价 2 条，商家 2 位（鸟西数码旗舰店 / 优选生活百货），优惠券 ${couponSpecs.length} 张（平台 3 + 店铺 1）`,
   );
 }
 

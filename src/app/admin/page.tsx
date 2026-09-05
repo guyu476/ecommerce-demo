@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { AdminCoupons } from "@/components/admin-coupons";
 import { AdminDashboard } from "@/components/admin-dashboard";
 import { OrderManager } from "@/components/order-manager";
 import { ProductManager } from "@/components/product-manager";
@@ -25,7 +26,7 @@ const ROLE_LABEL: Record<string, string> = {
   ADMIN: "管理员",
 };
 
-type AdminTab = "dashboard" | "products" | "orders" | "users";
+type AdminTab = "dashboard" | "products" | "orders" | "coupons" | "users";
 
 // 管理后台：数据看板 / 商品管理 / 订单管理 / 用户管理（仅管理员）
 export default function AdminPage() {
@@ -132,6 +133,7 @@ export default function AdminPage() {
             { key: "dashboard", label: "数据看板" },
             { key: "products", label: "商品管理" },
             { key: "orders", label: "订单管理" },
+            { key: "coupons", label: "优惠券" },
             { key: "users", label: "用户管理" },
           ] as { key: AdminTab; label: string }[]
         ).map((entry) => (
@@ -155,6 +157,8 @@ export default function AdminPage() {
       {tab === "products" && <ProductManager />}
 
       {tab === "orders" && <OrderManager role="ADMIN" />}
+
+      {tab === "coupons" && <AdminCoupons />}
 
       {tab === "users" && (
         <section className="overflow-hidden rounded-2xl border border-black/10 dark:border-white/15">
