@@ -9,7 +9,7 @@ import { ORDER_TRANSITIONS } from "@/types/order";
 // POST /api/orders/[id]/transition 订单状态流转
 // 状态机定义在 types/order.ts（契约层，接口与单测共用）：
 //   PENDING_PAYMENT --pay--> PAID --ship--> SHIPPED --confirm--> COMPLETED
-// 权限：买家本人可全部操作（演示便利）；商家可对含自己商品的订单发货；管理员只读监督
+// 权限：付款/确认收货=买家本人；发货=含本店商品的商家，管理员可兜底发货平台自营商品
 // 发货：trackingNo 可选，留空由服务端生成演示单号（BX 开头）；真实接入后必填电子面单号
 type Context = RouteContext<"/api/orders/[id]/transition">;
 
@@ -36,14 +36,17 @@ export async function POST(request: NextRequest, context: Context) {
       throw new ApiError("订单不存在", 40406, 404);
     }
 
+    // 权限：付款/确认收货=买家本人；发货=含本店商品的商家（管理员可兜底发货平台自营商品）
     const isOwner = order.userId === user.id;
     const isMerchantShip =
       user.role === "MERCHANT" &&
-      action === "ship" &&
       order.items.some((item) => item.product.sellerId === user.id);
+    const isAdminShip = user.role === "ADMIN"; // 平台自营商品（sellerId=null）无商家可发，管理员兜底
 
-    if (!isOwner && !isMerchantShip) {
-      throw new ApiError("订单不存在", 40406, 404);
+    const allowed =
+      action === "ship" ? isMerchantShip || isAdminShip : isOwner;
+    if (!allowed) {
+      throw new ApiError("没有权限执行该操作", 40301, 403);
     }
 
     if (order.status !== from) {

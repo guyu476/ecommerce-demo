@@ -455,14 +455,9 @@ export default function OrdersPage() {
                       </>
                     )}
                     {order.status === "PAID" && (
-                      <button
-                        type="button"
-                        disabled={busyId === order.id}
-                        onClick={() => transition(order.id, "ship")}
-                        className="rounded-full border border-black/15 px-4 py-1.5 text-xs transition-colors hover:border-ink disabled:opacity-40 dark:border-white/20"
-                      >
-                        模拟发货
-                      </button>
+                      <span className="rounded-full bg-mist px-4 py-1.5 text-xs opacity-60 dark:bg-white/10">
+                        等待商家发货
+                      </span>
                     )}
                     {order.status === "SHIPPED" && (
                       <button
