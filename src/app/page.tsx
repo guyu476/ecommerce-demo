@@ -102,14 +102,18 @@ export default async function Home({ searchParams }: PageProps<"/">) {
   const activeCategory = categories.find((c) => c.slug === categorySlug);
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
-  // 保留当前筛选条件拼接分页/排序链接
+  // 保留当前筛选条件拼接分页/排序/分类链接；overrides 里值为 undefined 表示删除该参数
   function withParams(overrides: Record<string, string | undefined>) {
     const query = new URLSearchParams();
     if (categorySlug) query.set("category", categorySlug);
     if (keyword) query.set("keyword", keyword);
     if (sort !== "default") query.set("sort", sort);
     for (const [key, value] of Object.entries(overrides)) {
-      if (value != null) query.set(key, value);
+      if (value == null) {
+        query.delete(key);
+      } else {
+        query.set(key, value);
+      }
     }
     const qs = query.toString();
     return qs ? `/?${qs}` : "/";
