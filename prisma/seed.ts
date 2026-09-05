@@ -400,6 +400,18 @@ async function main() {
     }
   }
 
+  // 演示收藏：demo 用户收藏两家店铺（幂等，「我的收藏·店铺」Tab 有数据可看）
+  for (const shop of [demoShop, demoShop2]) {
+    const existingFavorite = await prisma.favoriteShop.findFirst({
+      where: { userId: demoUser.id, shopId: shop.id },
+    });
+    if (!existingFavorite) {
+      await prisma.favoriteShop.create({
+        data: { userId: demoUser.id, shopId: shop.id },
+      });
+    }
+  }
+
   console.log(
     `种子数据完成：分类 ${categories.length} 个，新写入商品 ${created} 个（共 ${products.length} 条），演示订单 2 笔 + 评价 2 条，商家 2 位（鸟西数码旗舰店 / 优选生活百货），优惠券 ${couponSpecs.length} 张（平台 3 + 店铺 1）`,
   );

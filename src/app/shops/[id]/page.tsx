@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { DbSetupNotice } from "@/components/db-setup-notice";
 import { ProductCard } from "@/components/product-card";
+import { ShopFavoriteButton } from "@/components/shop-favorite-button";
 import { getShopById } from "@/lib/queries";
 
 type Props = PageProps<"/shops/[id]">;
@@ -69,6 +70,9 @@ export default async function ShopPage({ params }: Props) {
           >
             ← 回商城
           </Link>
+          <div className="ml-auto sm:ml-0">
+            <ShopFavoriteButton shopId={shop.id} />
+          </div>
         </div>
       </header>
 

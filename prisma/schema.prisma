@@ -36,6 +36,7 @@ model User {
   products     Product[]
   shop         Shop?
   favorites    Favorite[]
+  favoriteShops FavoriteShop[]
   userCoupons  UserCoupon[]
   issuedCoupons Coupon[]
 
@@ -144,6 +145,20 @@ model Favorite {
   @@map("favorites")
 }
 
+// 店铺收藏：店铺主页心形按钮，一用户一店一条（与商品收藏分开建表，各自幂等）
+model FavoriteShop {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shopId    Int      @map("shop_id")
+  shop      Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([userId, shopId])
+  @@index([shopId])
+  @@map("favorite_shops")
+}
+
 // ==================== 店铺 ====================
 
 enum ShopStatus {
@@ -165,6 +180,7 @@ model Shop {
   createdAt   DateTime   @default(now()) @map("created_at")
   updatedAt   DateTime   @updatedAt @map("updated_at")
   products    Product[]
+  favoritedBy FavoriteShop[]
 
   @@map("shops")
 }

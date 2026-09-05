@@ -61,7 +61,7 @@ npm run dev              # 启动开发服务器，打开 http://localhost:3000
 - 商品详情：多图画廊 + 灯箱、评分与评价列表、加入购物车、收藏心形、进店逛逛
 - 购物车 → 结算：**勾选结算**（单品圈选 + 全选，只结算勾中项，状态持久化）、地址簿预填、**优惠券抵扣**（平台券整单满减、店铺券按该店商品小计满减，服务端二次校验）、幂等键防重复下单
 - 订单：模拟支付、查看物流单号、确认收货、**申请退款（售后）**、评价（星级 + 文字）、五入口红点计数
-- 个人中心：昵称/头像、收货地址簿、我的收藏、领券中心（领券 + 我的券）
+- 个人中心：昵称/头像、收货地址簿、我的收藏（商品 + 店铺双 Tab）、优惠券（领券 + 我的券）
 
 **商家侧**（商家中心 `/merchant`）
 
@@ -95,7 +95,7 @@ npm run dev              # 启动开发服务器，打开 http://localhost:3000
 | `/cart`              | 购物车                                              |
 | `/checkout`          | 确认订单：地址簿、优惠券抵扣、幂等提交              |
 | `/orders`            | 我的订单：支付/物流/收货/退款/评价                  |
-| `/favorites`         | 我的收藏                                            |
+| `/favorites`         | 我的收藏：商品 / 店铺双 Tab                         |
 | `/user`              | 个人中心：资料、地址簿、**优惠券（领券 + 我的券）**、订单入口 |
 | `/login` `/register` | 密码登录 / 短信登录（模拟）/ 找回密码（模拟）/ 注册 |
 | `/merchant`          | 商家中心：店铺设置、商品管理、发货、退款处理        |
@@ -105,7 +105,7 @@ npm run dev              # 启动开发服务器，打开 http://localhost:3000
 
 ## 数据模型（prisma/schema.prisma）
 
-`User`（三角色）、`Address`、`CartItem`、`Category`、`Product`（挂 `sellerId` 与 `shopId`，带 `seedKey` 种子幂等键）、`Shop`（一人一店）、`Favorite`、`Coupon`（发券方 `ownerId`：空 = 平台券，非空 = 店铺券）/ `UserCoupon`（每人限领一张、一单至多用一张）、`Order`（含退款状态/原因/金额、物流单号、支付/发货/收货时间、券抵扣金额）、`OrderItem`（下单快照）、`Review`（一单一商品一条）、`IdempotencyKey`。
+`User`（三角色）、`Address`、`CartItem`、`Category`、`Product`（挂 `sellerId` 与 `shopId`，带 `seedKey` 种子幂等键）、`Shop`（一人一店）、`Favorite`、`Coupon`（发券方 `ownerId`：空 = 平台券，非空 = 店铺券）/ `UserCoupon`（每人限领一张、一单至多用一张）、`FavoriteShop`（店铺收藏）、`Order`（含退款状态/原因/金额、物流单号、支付/发货/收货时间、券抵扣金额）、`OrderItem`（下单快照）、`Review`（一单一商品一条）、`IdempotencyKey`。
 
 ## 目录结构
 
@@ -146,7 +146,8 @@ scripts/                    # 绑图 / 重置演示订单 / 清理测试账号
 | GET `/api/categories`                                                         | 分类列表（含在售计数）                                   |
 | GET `/api/products`                                                           | 商品分页：keyword（名称/描述）、sort、categoryId、status |
 | GET/POST/PATCH `/api/cart`（PATCH=全选/取消全选），PATCH/DELETE `/api/cart/[id]`（数量/勾选） | 购物车（`?checkedOnly=1` 只看勾选项） |
-| GET/POST `/api/favorites`，DELETE `?productId=`，GET `/api/favorites/ids`     | 收藏列表 / 收藏 / 取消 / 心形状态                        |
+| GET/POST `/api/favorites`，DELETE `?productId=`，GET `/api/favorites/ids`     | 商品收藏列表 / 收藏 / 取消 / 心形状态                    |
+| GET/POST `/api/favorite-shops`，DELETE `?shopId=`，GET `/api/favorite-shops/ids` | 店铺收藏列表 / 收藏 / 取消 / 心形状态                 |
 | GET `/api/coupons`，POST（领取），GET `/api/coupons/mine`                     | 券模板（含平台券/店铺券标识）/ 领取 / 我的券             |
 | GET/POST `/api/merchant/coupons`，DELETE `/api/merchant/coupons/[id]`         | 店铺券管理（商家发券，限本店商品满减；未领取可撤）       |
 | GET/POST `/api/admin/coupons`，DELETE `/api/admin/coupons/[id]`               | 平台券管理（管理员发券，全店通用；未领取可撤）           |
