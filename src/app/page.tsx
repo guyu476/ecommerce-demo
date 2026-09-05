@@ -166,7 +166,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
             {coupons.map((coupon) => (
               <li key={coupon.id}>
                 <Link
-                  href="/coupons"
+                  href="/user#coupons"
                   className="relative flex items-stretch overflow-hidden rounded-lg border-2 border-dashed border-promo/50 bg-white shadow-md transition-all hover:-translate-y-0.5 hover:shadow-lg dark:bg-white/5"
                 >
                   <span className="flex items-center gap-1 bg-promo/10 px-4 py-3 font-mono text-lg font-black text-promo">

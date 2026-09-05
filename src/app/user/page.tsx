@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AddressManager } from "@/components/address-manager";
+import { CouponCenter } from "@/components/coupon-center";
 import type { ApiResponse } from "@/types/api";
 import { isApiSuccess } from "@/types/api";
 
@@ -255,6 +256,11 @@ export default function UserCenterPage() {
 
       {/* 地址簿 */}
       <AddressManager />
+
+      {/* 优惠券中心：领券 + 我的券（锚点供首页券条幅/结算页跳转 /user#coupons） */}
+      <div id="coupons" className="scroll-mt-24">
+        <CouponCenter />
+      </div>
 
       {/* 我的订单：全部入口 + 未处理数量红点 */}
       <section className="overflow-hidden rounded-2xl border border-black/10 dark:border-white/15">

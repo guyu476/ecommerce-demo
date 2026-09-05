@@ -6,7 +6,6 @@ import { useState } from "react";
 // 移动端汉堡菜单：小屏显示，展开全站入口（桌面端由 header 常驻导航承接）
 const LINKS = [
   { href: "/", label: "🏠 首页" },
-  { href: "/coupons", label: "🎟️ 领券中心" },
   { href: "/cart", label: "🛒 购物车" },
   { href: "/user", label: "🙂 我的鸟西" },
   { href: "/merchant", label: "🏪 商家中心" },

@@ -76,9 +76,6 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
                   <Link href="/" className="hover:opacity-70">
                     首页
                   </Link>
-                  <Link href="/coupons" className="hover:opacity-70">
-                    领券中心
-                  </Link>
                   <UserNav />
                 </nav>
                 <MobileNav />

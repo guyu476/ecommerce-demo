@@ -356,7 +356,7 @@ export default function CheckoutPage() {
           {usableCoupons.length === 0 && (
             <p className="mt-1 text-xs opacity-50">
               没有满足门槛的可用券，可去
-              <Link href="/coupons" className="text-promo hover:underline">
+              <Link href="/user#coupons" className="text-promo hover:underline">
                 领券中心
               </Link>
               逛逛

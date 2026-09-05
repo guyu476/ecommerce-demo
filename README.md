@@ -96,8 +96,7 @@ npm run dev              # 启动开发服务器，打开 http://localhost:3000
 | `/checkout`          | 确认订单：地址簿、优惠券抵扣、幂等提交              |
 | `/orders`            | 我的订单：支付/物流/收货/退款/评价                  |
 | `/favorites`         | 我的收藏                                            |
-| `/coupons`           | 领券中心 + 我的优惠券                               |
-| `/user`              | 个人中心：资料、地址簿、订单入口                    |
+| `/user`              | 个人中心：资料、地址簿、**优惠券（领券 + 我的券）**、订单入口 |
 | `/login` `/register` | 密码登录 / 短信登录（模拟）/ 找回密码（模拟）/ 注册 |
 | `/merchant`          | 商家中心：店铺设置、商品管理、发货、退款处理        |
 | `/admin`             | 管理后台：数据看板、商品/订单/用户管理              |
@@ -116,7 +115,7 @@ src/
 │   ├── api/                # Route Handlers（auth/products/orders/coupons/favorites/shops/upload/admin ...）
 │   ├── products/[id]/      # 商品详情
 │   ├── shops/[id]/         # 店铺主页
-│   ├── favorites/ coupons/ # 收藏 / 领券中心
+│   ├── favorites/         # 收藏
 │   ├── cart/ checkout/ orders/ user/ login/ register/
 │   ├── merchant/ admin/    # 商家中心 / 管理后台
 │   ├── layout.tsx page.tsx loading.tsx   # 布局 / 首页 / 骨架屏

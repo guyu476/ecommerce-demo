@@ -31,8 +31,8 @@ type MyCoupon = {
   scopeLabel: string;
 };
 
-// 领券中心：上半区抢券（票根墙），下半区我的券（未使用/已使用）
-export default function CouponsPage() {
+// 优惠券中心（领券 + 我的券合拼）：嵌在「我的鸟西」里，发券入口在商家中心/管理后台
+export function CouponCenter() {
   const toast = useToast();
   const [templates, setTemplates] = useState<CouponTemplate[]>([]);
   const [mine, setMine] = useState<MyCoupon[]>([]);
@@ -46,10 +46,10 @@ export default function CouponsPage() {
     const templatesResult = (await templatesRes.json()) as ApiResponse<CouponTemplate[]>;
     const meResult = (await meRes.json()) as ApiResponse<{ id: number } | null>;
     if (isApiSuccess(templatesResult)) setTemplates(templatesResult.data);
-    const isloggedIn = isApiSuccess(meResult) && meResult.data != null;
-    setLoggedIn(isloggedIn);
+    const isLoggedIn = isApiSuccess(meResult) && meResult.data != null;
+    setLoggedIn(isLoggedIn);
 
-    if (isloggedIn) {
+    if (isLoggedIn) {
       const mineRes = await fetch("/api/coupons/mine");
       const mineResult = (await mineRes.json()) as ApiResponse<MyCoupon[]>;
       if (isApiSuccess(mineResult)) setMine(mineResult.data);
@@ -154,102 +154,30 @@ export default function CouponsPage() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-4xl flex-1 px-6 py-12">
-      <h1 className="mb-2 text-2xl font-extrabold tracking-tight">🎟️ 领券中心</h1>
-      <p className="mb-10 text-sm opacity-60">
-        每张券限领一张，结算时满足门槛即抵扣（演示币，开心就好）
-      </p>
-
-      {/* 抢券区 */}
-      {loading ? (
-        <div className="grid gap-4 sm:grid-cols-2">
-          {Array.from({ length: 4 }, (_, i) => (
-            <div key={i} className="skeleton h-24" />
-          ))}
+    <div className="space-y-8">
+      {/* 领券区 */}
+      <section className="overflow-hidden rounded-2xl border border-black/10 dark:border-white/15">
+        <div className="bg-mist px-6 py-3 text-sm font-semibold dark:bg-white/5">
+          🎟️ 领券中心
+          <span className="ml-2 text-xs font-normal opacity-55">
+            每张限领一张，平台券全店通用、店铺券限该店商品满减
+          </span>
         </div>
-      ) : templates.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-black/15 py-12 text-center text-sm opacity-60 dark:border-white/20">
-          券都发完了，下次趁早～
-        </p>
-      ) : (
-        <ul className="grid gap-4 sm:grid-cols-2">
-          {templates.map((coupon) => (
-            <li key={coupon.id}>
-              <CouponTicket
-                title={coupon.title}
-                threshold={coupon.threshold}
-                discount={coupon.discount}
-                scope={coupon.scope}
-                scopeLabel={coupon.scopeLabel}
-                footer={
-                  (coupon.expired ? "已过期" : `仅剩 ${coupon.remaining} 张`) +
-                  (coupon.scope === "shop" ? " · 限该店商品满减" : " · 全店通用")
-                }
-                muted={coupon.expired || (coupon.claimed && coupon.remaining === 0)}
-                action={
-                  coupon.expired ? (
-                    <span className="text-xs opacity-50">过期券不可领取</span>
-                  ) : coupon.claimed ? (
-                    <span className="text-xs text-emerald-600">✓ 已在囊中</span>
-                  ) : (
-                    <button
-                      type="button"
-                      disabled={busyId === coupon.id || coupon.remaining === 0}
-                      onClick={() => claim(coupon.id)}
-                      className="rounded-full bg-promo px-4 py-1 text-xs font-medium text-white transition-colors hover:bg-promo-deep disabled:opacity-40"
-                    >
-                      {busyId === coupon.id
-                        ? "领取中…"
-                        : coupon.remaining === 0
-                          ? "已抢光"
-                          : "立即领取"}
-                    </button>
-                  )
-                }
-              />
-            </li>
-          ))}
-        </ul>
-      )}
 
-      {/* 我的券 */}
-      {loggedIn && (
-        <section className="mt-14">
-          <div className="mb-5 flex items-center justify-between">
-            <h2 className="text-lg font-extrabold tracking-tight">我的优惠券</h2>
-            <div className="flex gap-2 text-sm">
-              <button
-                type="button"
-                onClick={() => setShowUsed(false)}
-                className={`rounded-full px-4 py-1.5 transition-colors ${
-                  !showUsed
-                    ? "bg-ink text-white"
-                    : "bg-mist hover:bg-black/10 dark:bg-white/10 dark:hover:bg-white/20"
-                }`}
-              >
-                未使用（{myUnused.length}）
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowUsed(true)}
-                className={`rounded-full px-4 py-1.5 transition-colors ${
-                  showUsed
-                    ? "bg-ink text-white"
-                    : "bg-mist hover:bg-black/10 dark:bg-white/10 dark:hover:bg-white/20"
-                }`}
-              >
-                已使用 / 过期（{myUsed.length}）
-              </button>
+        <div className="px-6 py-5">
+          {loading ? (
+            <div className="grid gap-4 sm:grid-cols-2">
+              {Array.from({ length: 4 }, (_, i) => (
+                <div key={i} className="skeleton h-24" />
+              ))}
             </div>
-          </div>
-
-          {(showUsed ? myUsed : myUnused).length === 0 ? (
+          ) : templates.length === 0 ? (
             <p className="rounded-xl border border-dashed border-black/15 py-10 text-center text-sm opacity-60 dark:border-white/20">
-              {showUsed ? "这里还没有用掉或过期的券" : "还没有可用的券，去上面挑两张吧"}
+              券都发完了，下次趁早～
             </p>
           ) : (
             <ul className="grid gap-4 sm:grid-cols-2">
-              {(showUsed ? myUsed : myUnused).map((coupon) => (
+              {templates.map((coupon) => (
                 <li key={coupon.id}>
                   <CouponTicket
                     title={coupon.title}
@@ -257,29 +185,109 @@ export default function CouponsPage() {
                     discount={coupon.discount}
                     scope={coupon.scope}
                     scopeLabel={coupon.scopeLabel}
-                    muted={coupon.status === "USED" || coupon.expired}
                     footer={
-                      coupon.status === "USED"
-                        ? `已使用 · ${new Date(coupon.expiresAt).toLocaleDateString("zh-CN")} 前有效`
-                        : coupon.expired
-                          ? "已过期"
-                          : `${new Date(coupon.expiresAt).toLocaleDateString("zh-CN")} 前有效`
+                      (coupon.expired ? "已过期" : `仅剩 ${coupon.remaining} 张`) +
+                      (coupon.scope === "shop" ? " · 限该店商品满减" : " · 全店通用")
+                    }
+                    muted={coupon.expired || (coupon.claimed && coupon.remaining === 0)}
+                    action={
+                      coupon.expired ? (
+                        <span className="text-xs opacity-50">过期券不可领取</span>
+                      ) : coupon.claimed ? (
+                        <span className="text-xs text-emerald-600">✓ 已在囊中</span>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={busyId === coupon.id || coupon.remaining === 0}
+                          onClick={() => claim(coupon.id)}
+                          className="rounded-full bg-promo px-4 py-1 text-xs font-medium text-white transition-colors hover:bg-promo-deep disabled:opacity-40"
+                        >
+                          {busyId === coupon.id
+                            ? "领取中…"
+                            : coupon.remaining === 0
+                              ? "已抢光"
+                              : "立即领取"}
+                        </button>
+                      )
                     }
                   />
                 </li>
               ))}
             </ul>
           )}
+        </div>
+      </section>
 
-          {myUnused.length > 0 && (
-            <p className="mt-6 text-center text-sm">
-              <Link href="/cart" className="text-promo hover:underline">
-                带着优惠券去结算 →
-              </Link>
-            </p>
-          )}
+      {/* 我的券 */}
+      {loggedIn && (
+        <section className="overflow-hidden rounded-2xl border border-black/10 dark:border-white/15">
+          <div className="flex flex-wrap items-center justify-between gap-2 bg-mist px-6 py-3 text-sm font-semibold dark:bg-white/5">
+            <span>我的优惠券</span>
+            <div className="flex gap-2 text-xs font-normal">
+              <button
+                type="button"
+                onClick={() => setShowUsed(false)}
+                className={`rounded-full px-3.5 py-1.5 transition-colors ${
+                  !showUsed
+                    ? "bg-ink text-white"
+                    : "bg-white/70 hover:bg-black/5 dark:bg-white/10 dark:hover:bg-white/20"
+                }`}
+              >
+                未使用（{myUnused.length}）
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowUsed(true)}
+                className={`rounded-full px-3.5 py-1.5 transition-colors ${
+                  showUsed
+                    ? "bg-ink text-white"
+                    : "bg-white/70 hover:bg-black/5 dark:bg-white/10 dark:hover:bg-white/20"
+                }`}
+              >
+                已使用 / 过期（{myUsed.length}）
+              </button>
+            </div>
+          </div>
+
+          <div className="px-6 py-5">
+            {(showUsed ? myUsed : myUnused).length === 0 ? (
+              <p className="rounded-xl border border-dashed border-black/15 py-10 text-center text-sm opacity-60 dark:border-white/20">
+                {showUsed ? "这里还没有用掉或过期的券" : "还没有可用的券，去上面挑两张吧"}
+              </p>
+            ) : (
+              <ul className="grid gap-4 sm:grid-cols-2">
+                {(showUsed ? myUsed : myUnused).map((coupon) => (
+                  <li key={coupon.id}>
+                    <CouponTicket
+                      title={coupon.title}
+                      threshold={coupon.threshold}
+                      discount={coupon.discount}
+                      scope={coupon.scope}
+                      scopeLabel={coupon.scopeLabel}
+                      muted={coupon.status === "USED" || coupon.expired}
+                      footer={
+                        coupon.status === "USED"
+                          ? `已使用 · ${new Date(coupon.expiresAt).toLocaleDateString("zh-CN")} 前有效`
+                          : coupon.expired
+                            ? "已过期"
+                            : `${new Date(coupon.expiresAt).toLocaleDateString("zh-CN")} 前有效`
+                      }
+                    />
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {myUnused.length > 0 && (
+              <p className="mt-5 text-center text-sm">
+                <Link href="/cart" className="text-promo hover:underline">
+                  带着优惠券去结算 →
+                </Link>
+              </p>
+            )}
+          </div>
         </section>
       )}
-    </main>
+    </div>
   );
 }
