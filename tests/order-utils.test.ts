@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { generateOrderNo, generateTrackingNo, hashRequest } from "@/lib/order";
+import { generateOrderNo, generateTrackingNo, groupByShop, hashRequest } from "@/lib/order";
 
 // 单号/单据生成器：格式稳定是下游（客服检索、物流对接）的隐性契约
 describe("generateOrderNo", () => {
@@ -58,5 +58,27 @@ describe("hashRequest", () => {
 
   it("输出为 64 位十六进制（SHA-256）", () => {
     expect(hashRequest({})).toMatch(/^[0-9a-f]{64}$/);
+  });
+});
+
+// 拆单分组：跨店购物按商家拆成独立订单
+describe("groupByShop", () => {
+  const item = (id: number, sellerId: number | null) => ({ id, product: { sellerId } });
+
+  it("按 sellerId 分组，组内保持原顺序", () => {
+    const groups = groupByShop([item(1, 7), item(2, 9), item(3, 7)]);
+    expect(groups.size).toBe(2);
+    expect([...groups.get(7)!.map((i) => i.id)]).toEqual([1, 3]);
+    expect([...groups.get(9)!.map((i) => i.id)]).toEqual([2]);
+  });
+
+  it("sellerId 为 null（平台自营）归入 0 号组", () => {
+    const groups = groupByShop([item(1, null), item(2, 7), item(3, null)]);
+    expect(groups.size).toBe(2);
+    expect([...groups.get(0)!.map((i) => i.id)]).toEqual([1, 3]);
+  });
+
+  it("空购物车返回空分组", () => {
+    expect(groupByShop([]).size).toBe(0);
   });
 });

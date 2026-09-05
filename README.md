@@ -59,7 +59,7 @@ npm run dev              # 启动开发服务器，打开 http://localhost:3000
 
 - 商城首页：搜索（名称/描述）、排序（综合/最新/价格升降）、分类票签筛选、热卖轮播、分页、领券条幅
 - 商品详情：多图画廊 + 灯箱、评分与评价列表、加入购物车、收藏心形、进店逛逛
-- 购物车 → 结算：**勾选结算**（单品圈选 + 全选，只结算勾中项，状态持久化）、地址簿预填、**优惠券抵扣**（平台券整单满减、店铺券按该店商品小计满减，服务端二次校验）、幂等键防重复下单
+- 购物车 → 结算：**勾选结算**（单品圈选 + 全选，只结算勾中项）、**跨店自动拆单**（一店一笔订单，各自发货/退款互不影响）、**优惠券抵扣**（平台券按最大子单满减、店铺券按本店子单满减，服务端二次校验）、幂等键防重复下单（重放返回整组子单）
 - 订单：模拟支付、查看物流单号、确认收货、**申请退款（售后）**、评价（星级 + 文字）、五入口红点计数
 - 个人中心：昵称/头像、收货地址簿、我的收藏（商品 + 店铺双 Tab）、优惠券（领券 + 我的券）
 
@@ -151,7 +151,7 @@ scripts/                    # 绑图 / 重置演示订单 / 清理测试账号
 | GET `/api/coupons`，POST（领取），GET `/api/coupons/mine`                     | 券模板（含平台券/店铺券标识）/ 领取 / 我的券             |
 | GET/POST `/api/merchant/coupons`，DELETE `/api/merchant/coupons/[id]`         | 店铺券管理（商家发券，限本店商品满减；未领取可撤）       |
 | GET/POST `/api/admin/coupons`，DELETE `/api/admin/coupons/[id]`               | 平台券管理（管理员发券，全店通用；未领取可撤）           |
-| POST `/api/orders`（Idempotency-Key + 可选 userCouponId）、GET                | 下单（券抵扣）/ 订单分页                                 |
+| POST `/api/orders`（Idempotency-Key + 可选 userCouponId）、GET                | 下单（跨店自动拆单，券抵扣）/ 订单分页                   |
 | GET `/api/orders/[id]`、GET `/api/orders/counts`                              | 订单详情 / 各状态计数                                    |
 | POST `/api/orders/[id]/transition`                                            | pay / ship（可带单号）/ confirm                          |
 | POST `/api/orders/[id]/cancel`                                                | 取消（仅待付款，回补库存）                               |

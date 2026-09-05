@@ -24,3 +24,27 @@ export function generateTrackingNo(): string {
     `${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
   return `BX${stamp}${pad(randomInt(0, 1000000), 6)}`;
 }
+
+// ============ 拆单分组 ============
+
+export interface ShopGroupableItem {
+  product: { sellerId: number | null };
+}
+
+/**
+ * 按商家拆单分组：跨店购物一次结算时，一店一笔订单，各自独立发货/退款/取消。
+ * sellerId 为 null（平台自营）归入 0 号组。保持原有条目顺序，组按首次出现顺序排列。
+ */
+export function groupByShop<T extends ShopGroupableItem>(items: T[]): Map<number, T[]> {
+  const groups = new Map<number, T[]>();
+  for (const item of items) {
+    const key = item.product.sellerId ?? 0;
+    const group = groups.get(key);
+    if (group) {
+      group.push(item);
+    } else {
+      groups.set(key, [item]);
+    }
+  }
+  return groups;
+}

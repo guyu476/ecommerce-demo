@@ -4,6 +4,8 @@
 import type { OrderStatus, RefundStatus } from "@prisma/client";
 
 // 下单入参：调用方提供（服务端生成订单号、状态、金额等）
+// 跨店拆单：一次结算按商家拆成多笔独立订单（同 checkoutGroupId），各自发货/退款/取消；
+// 优惠券落在其作用域子单上（平台券→金额最大子单，店铺券→该店子单）
 export interface CreateOrderInput {
   recipientName: string;
   recipientPhone: string;

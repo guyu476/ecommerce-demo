@@ -2,13 +2,14 @@ import type { NextRequest } from "next/server";
 import { z } from "zod";
 import { ApiError, handleRoute, isPrismaError, ok } from "@/lib/api-response";
 import { requireUser } from "@/lib/auth";
-import { generateOrderNo, hashRequest } from "@/lib/order";
+import { generateOrderNo, groupByShop, hashRequest } from "@/lib/order";
 import { prisma } from "@/lib/prisma";
 
-// ============ POST /api/orders 下单（从购物车结算） ============
+// ============ POST /api/orders 下单（从购物车结算，跨店自动拆单） ============
 // 契约：必须携带客户端生成的幂等键请求头 Idempotency-Key，重试时复用同一 key。
 // 服务端用唯一约束原子抢占实现幂等：同键同体返回已有订单（重放），同键异体响亮报 422。
-// 优惠券：可选 userCouponId（UNUSED、未过期、满足门槛），事务内核销并记录抵扣金额。
+// 拆单：勾选商品按商家分组，一店一笔订单（checkoutGroupId 同组），各自独立发货/退款/取消。
+// 优惠券落在其作用域的子单上：平台券→金额最大的子单，店铺券→该店子单。
 
 const createBodySchema = z.object({
   recipientName: z.string().trim().min(1, "收货人不能为空").max(50, "收货人最多 50 字"),
@@ -30,7 +31,7 @@ export async function POST(request: NextRequest) {
     const requestHash = hashRequest(body);
 
     try {
-      const order = await prisma.$transaction(async (tx) => {
+      const orders = await prisma.$transaction(async (tx) => {
         // 1. 原子抢占幂等键：并发由唯一约束裁决（先查后插是竞态，不是防护）
         await tx.idempotencyKey.create({
           data: { key: idempotencyKey, userId: user.id, requestHash },
@@ -46,8 +47,6 @@ export async function POST(request: NextRequest) {
         }
 
         // 3. 逐项条件更新扣库存（防超卖），任一失败整体回滚
-        const snapshots: { productId: number; name: string; price: string; quantity: number }[] =
-          [];
         for (const item of cartItems) {
           if (item.product.status !== "ON_SALE") {
             throw new ApiError(`商品「${item.product.name}」已下架`, 40902, 409);
@@ -59,19 +58,21 @@ export async function POST(request: NextRequest) {
           if (updated.count === 0) {
             throw new ApiError(`商品「${item.product.name}」库存不足`, 40902, 409);
           }
-          snapshots.push({
-            productId: item.productId,
-            name: item.product.name,
-            price: String(item.product.price),
-            quantity: item.quantity,
-          });
         }
 
-        // 4. 优惠券核销：UNUSED + 未过期 + 满门槛（平台券按整单合计，店铺券按该店商品小计），任一不满足整体回滚
-        const totalAmount = snapshots.reduce(
-          (sum, item) => sum + Number(item.price) * item.quantity,
-          0,
-        );
+        // 4. 按商家拆单分组（一店一笔；平台自营归 0 号组）
+        const groups = groupByShop(cartItems);
+        const groupTotals = new Map<number, number>();
+        for (const [sellerId, items] of groups) {
+          const total = items.reduce(
+            (sum, item) => sum + Number(item.product.price) * item.quantity,
+            0,
+          );
+          groupTotals.set(sellerId, total);
+        }
+
+        // 5. 优惠券核销：UNUSED + 未过期 + 满门槛，落在其作用域的子单上
+        let discountTargetSeller: number | null | undefined; // undefined=未用券
         let discountAmount = 0;
         let userCouponId: number | undefined;
         if (body.userCouponId) {
@@ -88,28 +89,42 @@ export async function POST(request: NextRequest) {
           if (userCoupon.coupon.expiresAt < new Date()) {
             throw new ApiError("优惠券已过期", 40906, 409);
           }
+
           const threshold = Number(userCoupon.coupon.threshold);
           if (userCoupon.coupon.ownerId === null) {
-            // 平台券：整单满减
-            if (threshold > totalAmount) {
-              throw new ApiError(`该券满 ${threshold} 元可用，还差一点哦`, 40906, 409);
+            // 平台券：落在金额最大的子单上，按该子单合计校验门槛
+            let bestSeller: number | null | undefined;
+            let bestTotal = -1;
+            for (const [sellerId, total] of groupTotals) {
+              if (total > bestTotal) {
+                bestTotal = total;
+                bestSeller = sellerId === 0 ? null : sellerId;
+              }
             }
-          } else {
-            // 店铺券：该商家店铺商品的订单小计满减（跨店混购时只算本店部分）
-            const shopSubtotal = cartItems
-              .filter((item) => item.product.sellerId === userCoupon.coupon.ownerId)
-              .reduce((sum, item) => sum + Number(item.product.price) * item.quantity, 0);
-            if (shopSubtotal === 0) {
-              throw new ApiError("该券是店铺券，购物车里没有这个店铺的商品", 40906, 409);
-            }
-            if (threshold > shopSubtotal) {
+            if (bestSeller === undefined || threshold > bestTotal) {
               throw new ApiError(
-                `该券限店铺商品满 ${threshold} 元可用（当前本店小计 ${shopSubtotal.toFixed(2)} 元）`,
+                `该券满 ${threshold} 元可用（拆单后单笔最高 ${Math.max(0, bestTotal).toFixed(2)} 元）`,
                 40906,
                 409,
               );
             }
+            discountTargetSeller = bestSeller;
+          } else {
+            // 店铺券：必须落在该店子单上，按该店小计校验门槛
+            const shopTotal = groupTotals.get(userCoupon.coupon.ownerId);
+            if (shopTotal === undefined) {
+              throw new ApiError("该券是店铺券，勾选的商品里没有这个店铺的", 40906, 409);
+            }
+            if (threshold > shopTotal) {
+              throw new ApiError(
+                `该券限店铺商品满 ${threshold} 元可用（当前本店小计 ${shopTotal.toFixed(2)} 元）`,
+                40906,
+                409,
+              );
+            }
+            discountTargetSeller = userCoupon.coupon.ownerId;
           }
+
           const claimed = await tx.userCoupon.updateMany({
             where: { id: userCoupon.id, status: "UNUSED" },
             data: { status: "USED", usedAt: new Date() },
@@ -121,49 +136,62 @@ export async function POST(request: NextRequest) {
           userCouponId = userCoupon.id;
         }
 
-        // 5. 创建订单 + 条目快照（金额按数据库现价合计；应付 = 合计 - 券抵扣）
-        const order = await tx.order.create({
-          data: {
-            orderNo: generateOrderNo(),
-            userId: user.id,
-            totalAmount,
-            discountAmount,
-            recipientName: body.recipientName,
-            recipientPhone: body.recipientPhone,
-            shippingAddress: body.shippingAddress,
-            items: {
-              create: snapshots.map((item) => ({
-                productId: item.productId,
-                name: item.name,
-                price: item.price,
-                quantity: item.quantity,
-              })),
-            },
-          },
-          include: { items: true },
-        });
+        // 6. 每店创建一笔订单（同组共享 checkoutGroupId = 幂等键值）
+        const createdOrders = [];
+        for (const [sellerId, items] of groups) {
+          const totalAmount = groupTotals.get(sellerId)!;
+          const orderDiscount =
+            discountTargetSeller !== undefined && sellerId === (discountTargetSeller ?? 0)
+              ? discountAmount
+              : 0;
 
-        // 6. 绑定用掉的券（一单一券，唯一约束兜底）
-        if (userCouponId) {
-          await tx.userCoupon.update({
-            where: { id: userCouponId },
-            data: { orderId: order.id },
+          const order = await tx.order.create({
+            data: {
+              orderNo: generateOrderNo(),
+              checkoutGroupId: idempotencyKey,
+              userId: user.id,
+              totalAmount,
+              discountAmount: orderDiscount,
+              recipientName: body.recipientName,
+              recipientPhone: body.recipientPhone,
+              shippingAddress: body.shippingAddress,
+              items: {
+                create: items.map((item) => ({
+                  productId: item.productId,
+                  name: item.product.name,
+                  price: String(item.product.price),
+                  quantity: item.quantity,
+                })),
+              },
+            },
+            include: { items: true },
           });
+          createdOrders.push(order);
+
+          // 用掉的券绑定其子单（orderId 唯一，一券一单）
+          if (userCouponId && orderDiscount > 0) {
+            await tx.userCoupon.update({
+              where: { id: userCouponId },
+              data: { orderId: order.id },
+            });
+          }
         }
 
         // 7. 清空已结算的购物车（只删勾选结算的条目，未勾选的保留）
         await tx.cartItem.deleteMany({ where: { userId: user.id, checked: true } });
 
-        // 8. 幂等键绑定订单，供后续重放
+        // 8. 幂等键绑定首单，供后续重放（整组经 checkoutGroupId 取回）
         await tx.idempotencyKey.update({
           where: { key: idempotencyKey },
-          data: { orderId: order.id },
+          data: { orderId: createdOrders[0].id },
         });
 
-        return order;
+        return createdOrders;
       });
 
-      return ok(order, "下单成功");
+      const splitHint =
+        orders.length > 1 ? `，已按店铺拆成 ${orders.length} 笔订单分别发货` : "";
+      return ok({ orders }, `下单成功${splitHint}`);
     } catch (error) {
       // 幂等键冲突：并发或重试时由唯一约束裁决，走重放或响亮报错
       if (isPrismaError(error, "P2002")) {
@@ -177,11 +205,21 @@ export async function POST(request: NextRequest) {
           throw new ApiError("同一幂等键被用于不同的下单内容", 42201, 422);
         }
         if (existing?.orderId) {
-          const order = await prisma.order.findUnique({
+          const first = await prisma.order.findUnique({
             where: { id: existing.orderId },
             include: { items: true },
           });
-          return ok(order, "订单已存在（幂等重放）");
+          // 拆单组重放：取回同一 checkoutGroupId 的全部子单；老数据（无组）退回单笔
+          const replayed = first?.checkoutGroupId
+            ? await prisma.order.findMany({
+                where: { checkoutGroupId: first.checkoutGroupId, userId: user.id },
+                include: { items: true },
+                orderBy: { id: "asc" },
+              })
+            : first
+              ? [first]
+              : [];
+          return ok({ orders: replayed }, "订单已存在（幂等重放）");
         }
       }
       throw error;

@@ -229,6 +229,8 @@ enum RefundStatus {
 model Order {
   id              Int          @id @default(autoincrement())
   orderNo         String       @unique @map("order_no") @db.VarChar(32)
+  // 拆单组：跨店购物一次结算按店铺拆成多笔订单，同组订单共享此 id（幂等重放据此取整组）
+  checkoutGroupId String?      @map("checkout_group_id") @db.VarChar(80)
   userId          Int          @map("user_id")
   user            User         @relation(fields: [userId], references: [id])
   status          OrderStatus  @default(PENDING_PAYMENT)
@@ -254,6 +256,7 @@ model Order {
 
   @@index([userId])
   @@index([status])
+  @@index([checkoutGroupId])
   @@map("orders")
 }
 

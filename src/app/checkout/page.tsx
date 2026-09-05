@@ -21,7 +21,7 @@ type CartItem = {
 
 type CartData = { items: CartItem[]; totalQuantity: number; totalPrice: number };
 
-type OrderCreated = { id: number; orderNo: string };
+type OrderCreated = { orders: { id: number; orderNo: string }[] };
 
 // 结算可用券：UNUSED 且未过期；平台券按整单门槛，店铺券按该店商品小计门槛（一单限用一张）
 type MyCoupon = {
@@ -135,13 +135,13 @@ export default function CheckoutPage() {
       const result = (await res.json()) as ApiResponse<MyCoupon[]>;
       if (!isApiSuccess(result)) return;
 
+      // 拆单子单小计（与服务端 groupByShop 同口径：sellerId=null 平台自营记为 0 号组）
       const shopSubtotals = new Map<number, number>();
       for (const item of cart!.items) {
-        if (item.product.sellerId == null) continue;
+        const key = item.product.sellerId ?? 0;
         shopSubtotals.set(
-          item.product.sellerId,
-          (shopSubtotals.get(item.product.sellerId) ?? 0) +
-            Number(item.product.price) * item.quantity,
+          key,
+          (shopSubtotals.get(key) ?? 0) + Number(item.product.price) * item.quantity,
         );
       }
 
@@ -149,7 +149,11 @@ export default function CheckoutPage() {
         result.data.filter((coupon) => {
           if (coupon.status !== "UNUSED" || coupon.expired) return false;
           const threshold = Number(coupon.threshold);
-          if (coupon.scope === "platform") return threshold <= cart!.totalPrice;
+          if (coupon.scope === "platform") {
+            // 拆单后平台券按最大单笔子单校验（与服务端同口径）
+            const maxSubTotal = Math.max(0, ...shopSubtotals.values());
+            return threshold <= maxSubTotal;
+          }
           const shopSubtotal = shopSubtotals.get(coupon.ownerUserId ?? 0) ?? 0;
           return shopSubtotal > 0 && threshold <= shopSubtotal;
         }),
@@ -183,7 +187,7 @@ export default function CheckoutPage() {
       const result = (await res.json()) as ApiResponse<OrderCreated>;
 
       if (result.code === 0 || result.code === 40905) {
-        // 下单成功或幂等重放（拿到的都是同一笔订单），进入订单列表
+        // 下单成功或幂等重放（跨店已按店铺拆成多笔子单），进入订单列表
         router.push("/orders");
         router.refresh();
         return;
@@ -243,6 +247,10 @@ export default function CheckoutPage() {
   return (
     <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-8">
       <h1 className="mb-6 text-2xl font-bold tracking-tight">确认订单</h1>
+
+      <p className="mb-4 rounded-lg bg-market/10 px-4 py-2.5 text-xs leading-5">
+        🧾 跨店商品将<strong>按店铺自动拆成多笔订单</strong>，各店铺独立发货/退款，互不影响
+      </p>
 
       <ul className="mb-6 divide-y divide-black/10 rounded-xl border border-black/10 dark:divide-white/10 dark:border-white/15">
         {cart.items.map((item) => (
