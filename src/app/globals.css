@@ -139,6 +139,15 @@ html {
   border-top: 2px dashed rgba(20, 33, 61, 0.12);
 }
 
+/* 撕票根：锯齿撕口（票根撕走后底层露出的毛边） */
+.tear-edge {
+  background-image:
+    linear-gradient(135deg, rgba(230, 57, 70, 0.16) 30%, transparent 30%),
+    linear-gradient(225deg, rgba(230, 57, 70, 0.16) 30%, transparent 30%);
+  background-size: 12px 12px;
+  background-repeat: repeat-x;
+}
+
 /* 撕票根：剪刀悬停提示 */
 @keyframes scissors-wiggle {
   0%,
