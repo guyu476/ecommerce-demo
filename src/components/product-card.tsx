@@ -34,6 +34,16 @@ export function ProductCard({
           ) : null}
         </div>
 
+        {/* hover 提示层：底部渐变 + 查看详情 */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 bottom-0 flex items-end justify-center bg-gradient-to-t from-black/50 to-transparent pb-3 pt-10 opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+        >
+          <span className="rounded-full bg-white/90 px-3 py-1 text-xs font-medium text-ink">
+            查看详情 →
+          </span>
+        </div>
+
         {rank != null && rank <= 3 && (
           <span className="absolute top-0 right-0 rounded-bl-xl bg-ink px-2.5 py-1 font-mono text-[11px] font-bold text-market">
             TOP {rank}

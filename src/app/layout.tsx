@@ -83,11 +83,91 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             </div>
           </header>
 
-          {children}
+        {children}
 
-          <footer className="bg-mist py-10 text-center text-xs opacity-60 dark:bg-white/5">
-            鸟西商城 · Next.js 全栈演示项目
-          </footer>
+        {/* 画报风页脚：品牌 + 服务导航 + 演示声明 */}
+        <footer className="bg-ink text-white/80">
+          <div className="mx-auto grid w-full max-w-6xl gap-10 px-6 py-12 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <BirdMark />
+                <span className="text-lg font-bold text-white">鸟西商城</span>
+              </div>
+              <p className="text-sm leading-6 text-white/60">
+                一家开在市集画报里的在线小店。
+                <br />
+                Next.js 全栈演示 · 支付/短信/物流为演示流程
+              </p>
+            </div>
+
+            <div>
+              <p className="mb-3 text-sm font-semibold text-white">买家服务</p>
+              <ul className="space-y-2 text-sm text-white/60">
+                <li>
+                  <Link href="/user?tab=coupons" className="transition-colors hover:text-market">
+                    🎟️ 领券中心
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/orders" className="transition-colors hover:text-market">
+                    🧾 我的订单
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/favorites" className="transition-colors hover:text-market">
+                    ❤️ 我的收藏
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/cart" className="transition-colors hover:text-market">
+                    🛒 购物车
+                  </Link>
+                </li>
+              </ul>
+            </div>
+
+            <div>
+              <p className="mb-3 text-sm font-semibold text-white">商家与平台</p>
+              <ul className="space-y-2 text-sm text-white/60">
+                <li>
+                  <Link href="/merchant" className="transition-colors hover:text-market">
+                    🏪 商家中心
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/admin" className="transition-colors hover:text-market">
+                    🛡️ 管理后台
+                  </Link>
+                </li>
+                <li>
+                  <a
+                    href="https://github.com/guyu476/ecommerce-demo"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="transition-colors hover:text-market"
+                  >
+                    🐙 GitHub 开源仓库
+                  </a>
+                </li>
+              </ul>
+            </div>
+
+            <div>
+              <p className="mb-3 text-sm font-semibold text-white">演示账号</p>
+              <ul className="space-y-1.5 font-mono text-xs leading-5 text-white/50">
+                <li>用户 demo@example.com</li>
+                <li>商家 merchant@example.com</li>
+                <li>商家2 merchant2@example.com</li>
+                <li>管理员 admin@example.com</li>
+                <li className="pt-1 text-white/40">密码均为「账号前缀 + 123456」</li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="border-t border-white/10 py-4 text-center text-xs text-white/40">
+            © 2026 鸟西商城 · 仅供学习与技术演示
+          </div>
+        </footer>
         </ToastProvider>
       </body>
     </html>
