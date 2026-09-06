@@ -18,6 +18,17 @@ type Me = {
 
 const AVATAR_OPTIONS = ["🙂", "😎", "🥰", "🤠", "🐱", "🐼", "🦊", "🐸", "🌟", "🔥", "🍀", "🎉"];
 
+type UserTab = "profile" | "address" | "coupons" | "favorites" | "orders";
+
+// 初始 Tab：支持 /user?tab=xxx 直达；/user#coupons 旧锚点链接自动落到优惠券 Tab
+function initialUserTab(): UserTab {
+  if (typeof window === "undefined") return "coupons";
+  const tabParam = new URLSearchParams(window.location.search).get("tab");
+  const valid: UserTab[] = ["profile", "address", "coupons", "favorites", "orders"];
+  if (tabParam && valid.includes(tabParam as UserTab)) return tabParam as UserTab;
+  return window.location.hash === "#coupons" ? "coupons" : "coupons";
+}
+
 // 头像统一渲染：data URL 用 <img>，emoji 用文字
 function AvatarView({ avatar, sizeClass }: { avatar: string | null; sizeClass: string }) {
   if (avatar?.startsWith("data:")) {
@@ -27,9 +38,10 @@ function AvatarView({ avatar, sizeClass }: { avatar: string | null; sizeClass: s
   return <span className={`${sizeClass} flex items-center justify-center`}>{avatar ?? "🙂"}</span>;
 }
 
-// 我的鸟西：个人中心（改昵称/头像上传 + 地址簿 + 订单入口）
+// 我的鸟西：个人中心（Tab 导航：优惠券/订单/收藏/地址簿/资料）
 export default function UserCenterPage() {
   const router = useRouter();
+  const [tab, setTab] = useState<UserTab>(() => initialUserTab());
   const [status, setStatus] = useState<"loading" | "guest" | "ready">("loading");
   const [me, setMe] = useState<Me | null>(null);
   const [nickname, setNickname] = useState("");
@@ -185,11 +197,40 @@ export default function UserCenterPage() {
     "w-full rounded-lg border border-black/15 px-3 py-2 text-sm dark:border-white/20";
 
   return (
-    <main className="mx-auto w-full max-w-2xl flex-1 space-y-8 px-6 py-12">
+    <main className="mx-auto w-full max-w-2xl flex-1 space-y-6 px-6 py-12">
       <h1 className="text-2xl font-extrabold tracking-tight">我的鸟西</h1>
 
-      {/* 个人信息卡 */}
-      <section className="rounded-2xl border border-black/10 bg-white p-6 dark:border-white/15 dark:bg-white/5">
+      {/* 功能导航：每次只渲染当前 Tab，免长页下拉 */}
+      <nav className="flex flex-wrap gap-2">
+        {(
+          [
+            { key: "coupons", label: "🎟️ 优惠券" },
+            { key: "orders", label: "🧾 我的订单" },
+            { key: "favorites", label: "❤️ 我的收藏" },
+            { key: "address", label: "📖 地址簿" },
+            { key: "profile", label: "👤 个人资料" },
+          ] as { key: UserTab; label: string }[]
+        ).map((entry) => (
+          <button
+            key={entry.key}
+            type="button"
+            onClick={() => setTab(entry.key)}
+            aria-current={tab === entry.key ? "page" : undefined}
+            className={`rounded-full px-5 py-2 text-sm font-medium transition-all ${
+              tab === entry.key
+                ? "bg-ink text-white shadow-md"
+                : "bg-mist hover:bg-black/10 dark:bg-white/10 dark:hover:bg-white/20"
+            }`}
+          >
+            {entry.label}
+          </button>
+        ))}
+      </nav>
+
+      {/* 个人资料 Tab：资料卡 + 退出登录 */}
+      {tab === "profile" && (
+        <>
+          <section className="rounded-2xl border border-black/10 bg-white p-6 dark:border-white/15 dark:bg-white/5">
         <div className="mb-6 flex items-center gap-5">
           <span
             className="seal flex h-20 w-20 overflow-hidden rounded-full text-5xl"
@@ -267,91 +308,6 @@ export default function UserCenterPage() {
         </form>
       </section>
 
-      {/* 地址簿 */}
-      <AddressManager />
-
-      {/* 优惠券中心：领券 + 我的券（锚点供首页券条幅/结算页跳转 /user#coupons） */}
-      <div id="coupons" className="scroll-mt-24">
-        <CouponCenter />
-      </div>
-
-      {/* 我的收藏入口：商品 + 店铺（数量红点） */}
-      <section className="overflow-hidden rounded-2xl border border-black/10 dark:border-white/15">
-        <h2 className="bg-mist px-6 py-3 text-sm font-semibold dark:bg-white/5">我的收藏</h2>
-        <ul className="divide-y divide-black/5 dark:divide-white/10">
-          {(
-            [
-              { label: "❤️ 收藏的商品", href: "/favorites", count: productFavoriteCount },
-              {
-                label: "🏪 收藏的店铺",
-                href: "/favorites?tab=shops",
-                count: shopFavoriteCount,
-              },
-            ] as { label: string; href: string; count: number }[]
-          ).map((entry) => (
-            <li key={entry.href}>
-              <Link
-                href={entry.href}
-                className="flex items-center justify-between px-6 py-4 text-sm transition-colors hover:bg-mist dark:hover:bg-white/5"
-              >
-                <span className="flex items-center gap-2">
-                  {entry.label}
-                  {entry.count > 0 && (
-                    <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-promo px-1.5 text-[10px] font-bold text-white">
-                      {entry.count > 99 ? "99+" : entry.count}
-                    </span>
-                  )}
-                </span>
-                <span className="opacity-40">›</span>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      {/* 我的订单：全部入口 + 未处理数量红点 */}
-      <section className="overflow-hidden rounded-2xl border border-black/10 dark:border-white/15">
-        <h2 className="bg-mist px-6 py-3 text-sm font-semibold dark:bg-white/5">我的订单</h2>
-        <ul className="divide-y divide-black/5 dark:divide-white/10">
-          {[
-            { label: "🧾 全部订单", href: "/orders", count: 0 },
-            {
-              label: "⏳ 待付款",
-              href: "/orders?status=PENDING_PAYMENT",
-              count: orderCounts?.pending ?? 0,
-            },
-            { label: "📦 待发货", href: "/orders?status=PAID", count: orderCounts?.paid ?? 0 },
-            {
-              label: "🚚 待收货",
-              href: "/orders?status=SHIPPED",
-              count: orderCounts?.shipped ?? 0,
-            },
-            {
-              label: "✍️ 待评价",
-              href: "/orders?filter=unreviewed",
-              count: orderCounts?.unreviewed ?? 0,
-            },
-          ].map((entry) => (
-            <li key={entry.href}>
-              <Link
-                href={entry.href}
-                className="flex items-center justify-between px-6 py-4 text-sm transition-colors hover:bg-mist dark:hover:bg-white/5"
-              >
-                <span className="flex items-center gap-2">
-                  {entry.label}
-                  {entry.count > 0 && (
-                    <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-promo px-1.5 text-[10px] font-bold text-white">
-                      {entry.count > 99 ? "99+" : entry.count}
-                    </span>
-                  )}
-                </span>
-                <span className="opacity-40">›</span>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </section>
-
       <button
         type="button"
         onClick={logout}
@@ -359,6 +315,98 @@ export default function UserCenterPage() {
       >
         退出登录
       </button>
+      </>
+
+      )}
+
+      {/* 地址簿 Tab */}
+      {tab === "address" && <AddressManager />}
+
+      {/* 优惠券中心 Tab：领券 + 我的券（锚点供首页券条幅/结算页跳转 /user?tab=coupons） */}
+      {tab === "coupons" && (
+        <div id="coupons" className="scroll-mt-24">
+          <CouponCenter />
+        </div>
+      )}
+
+      {/* 我的收藏 Tab：商品 + 店铺入口（数量红点） */}
+      {tab === "favorites" && (
+        <section className="overflow-hidden rounded-2xl border border-black/10 dark:border-white/15">
+          <ul className="divide-y divide-black/5 dark:divide-white/10">
+            {(
+              [
+                { label: "❤️ 收藏的商品", href: "/favorites", count: productFavoriteCount },
+                {
+                  label: "🏪 收藏的店铺",
+                  href: "/favorites?tab=shops",
+                  count: shopFavoriteCount,
+                },
+              ] as { label: string; href: string; count: number }[]
+            ).map((entry) => (
+              <li key={entry.href}>
+                <Link
+                  href={entry.href}
+                  className="flex items-center justify-between px-6 py-4 text-sm transition-colors hover:bg-mist dark:hover:bg-white/5"
+                >
+                  <span className="flex items-center gap-2">
+                    {entry.label}
+                    {entry.count > 0 && (
+                      <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-promo px-1.5 text-[10px] font-bold text-white">
+                        {entry.count > 99 ? "99+" : entry.count}
+                      </span>
+                    )}
+                  </span>
+                  <span className="opacity-40">›</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {/* 我的订单 Tab：全部入口 + 未处理数量红点 */}
+      {tab === "orders" && (
+        <section className="overflow-hidden rounded-2xl border border-black/10 dark:border-white/15">
+          <ul className="divide-y divide-black/5 dark:divide-white/10">
+            {[
+              { label: "🧾 全部订单", href: "/orders", count: 0 },
+              {
+                label: "⏳ 待付款",
+                href: "/orders?status=PENDING_PAYMENT",
+                count: orderCounts?.pending ?? 0,
+              },
+              { label: "📦 待发货", href: "/orders?status=PAID", count: orderCounts?.paid ?? 0 },
+              {
+                label: "🚚 待收货",
+                href: "/orders?status=SHIPPED",
+                count: orderCounts?.shipped ?? 0,
+              },
+              {
+                label: "✍️ 待评价",
+                href: "/orders?filter=unreviewed",
+                count: orderCounts?.unreviewed ?? 0,
+              },
+            ].map((entry) => (
+              <li key={entry.href}>
+                <Link
+                  href={entry.href}
+                  className="flex items-center justify-between px-6 py-4 text-sm transition-colors hover:bg-mist dark:hover:bg-white/5"
+                >
+                  <span className="flex items-center gap-2">
+                    {entry.label}
+                    {entry.count > 0 && (
+                      <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-promo px-1.5 text-[10px] font-bold text-white">
+                        {entry.count > 99 ? "99+" : entry.count}
+                      </span>
+                    )}
+                  </span>
+                  <span className="opacity-40">›</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </main>
   );
 }

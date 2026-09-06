@@ -28,10 +28,19 @@ const ROLE_LABEL: Record<string, string> = {
 
 type AdminTab = "dashboard" | "products" | "orders" | "coupons" | "users";
 
-// 管理后台：数据看板 / 商品管理 / 订单管理 / 用户管理（仅管理员）
+const VALID_TABS: AdminTab[] = ["dashboard", "products", "orders", "coupons", "users"];
+
+// 管理后台：数据看板 / 商品管理 / 订单管理 / 优惠券 / 用户管理（仅管理员）
 export default function AdminPage() {
   const [status, setStatus] = useState<"loading" | "guest" | "denied" | "ready">("loading");
-  const [tab, setTab] = useState<AdminTab>("dashboard");
+  const [tab, setTab] = useState<AdminTab>(() => {
+    if (typeof window === "undefined") return "dashboard";
+    const param = new URLSearchParams(window.location.search).get("tab");
+    return VALID_TABS.includes(param as AdminTab) ? (param as AdminTab) : "dashboard";
+  });
+  // Tab 红点：待发货与退款待处理（来自看板统计，后台最该盯的异常项）
+  const [pendingShipment, setPendingShipment] = useState(0);
+  const [refundPending, setRefundPending] = useState(0);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [busyUserId, setBusyUserId] = useState<number | null>(null);
 
@@ -66,6 +75,16 @@ export default function AdminPage() {
       }
       setStatus("ready");
       await loadUsers();
+
+      // 拉取待办数字（订单 Tab 红点用）
+      const statsRes = (await fetch("/api/admin/stats").then((r) => r.json())) as ApiResponse<{
+        pendingShipment: number;
+        refundPending: number;
+      }>;
+      if (isApiSuccess(statsRes)) {
+        setPendingShipment(statsRes.data.pendingShipment);
+        setRefundPending(statsRes.data.refundPending);
+      }
     } else {
       setStatus("guest");
     }
@@ -141,6 +160,7 @@ export default function AdminPage() {
             key={entry.key}
             type="button"
             onClick={() => setTab(entry.key)}
+            aria-current={tab === entry.key ? "page" : undefined}
             className={`rounded-full px-6 py-2 text-sm font-medium transition-all ${
               tab === entry.key
                 ? "bg-ink text-white shadow-md"
@@ -148,6 +168,16 @@ export default function AdminPage() {
             }`}
           >
             {entry.label}
+            {entry.key === "orders" && refundPending > 0 && (
+              <span className="ml-1.5 rounded-full bg-promo px-1.5 py-0.5 text-[10px] text-white">
+                {refundPending} 退款
+              </span>
+            )}
+            {entry.key === "orders" && pendingShipment > 0 && (
+              <span className="ml-1.5 rounded-full bg-market px-1.5 py-0.5 text-[10px] text-ink">
+                {pendingShipment} 待发
+              </span>
+            )}
           </button>
         ))}
       </div>
