@@ -159,7 +159,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
                 <li>商家 merchant@example.com</li>
                 <li>商家2 merchant2@example.com</li>
                 <li>管理员 admin@example.com</li>
-                <li className="pt-1 text-white/40">密码均为「账号前缀 + 123456」</li>
+                <li className="pt-1 text-white/40">密码统一为 123456</li>
               </ul>
             </div>
           </div>

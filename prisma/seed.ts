@@ -124,38 +124,38 @@ const products: SeedProduct[] = [
 ];
 
 async function main() {
-  // 演示账号：demo@example.com / demo123456（幂等，密码变更不覆盖）
+  // 演示账号：demo@example.com / 123456（幂等；密码统一 123456，重复执行会重置回演示密码）
   const demoUser = await prisma.user.upsert({
     where: { email: "demo@example.com" },
-    update: {},
+    update: { passwordHash: await bcrypt.hash("123456", 10) },
     create: {
       email: "demo@example.com",
       nickname: "演示用户",
-      passwordHash: await bcrypt.hash("demo123456", 10),
+      passwordHash: await bcrypt.hash("123456", 10),
     },
   });
 
-  // 管理员账号：admin@example.com / admin123456
+  // 管理员账号：admin@example.com / 123456
   await prisma.user.upsert({
     where: { email: "admin@example.com" },
-    update: {},
+    update: { passwordHash: await bcrypt.hash("123456", 10) },
     create: {
       email: "admin@example.com",
       nickname: "平台管理员",
       role: "ADMIN",
-      passwordHash: await bcrypt.hash("admin123456", 10),
+      passwordHash: await bcrypt.hash("123456", 10),
     },
   });
 
-  // 商家账号：merchant@example.com / merchant123456
+  // 商家账号：merchant@example.com / 123456
   const merchantUser = await prisma.user.upsert({
     where: { email: "merchant@example.com" },
-    update: {},
+    update: { passwordHash: await bcrypt.hash("123456", 10) },
     create: {
       email: "merchant@example.com",
       nickname: "鸟西自营数码店",
       role: "MERCHANT",
-      passwordHash: await bcrypt.hash("merchant123456", 10),
+      passwordHash: await bcrypt.hash("123456", 10),
     },
   });
 
@@ -171,15 +171,15 @@ async function main() {
     },
   });
 
-  // 商家账号 2：merchant2@example.com / merchant123456（平台是多家店，不是一家超市）
+  // 商家账号 2：merchant2@example.com / 123456（平台是多家店，不是一家超市）
   const merchant2User = await prisma.user.upsert({
     where: { email: "merchant2@example.com" },
-    update: {},
+    update: { passwordHash: await bcrypt.hash("123456", 10) },
     create: {
       email: "merchant2@example.com",
       nickname: "优选生活百货",
       role: "MERCHANT",
-      passwordHash: await bcrypt.hash("merchant123456", 10),
+      passwordHash: await bcrypt.hash("123456", 10),
     },
   });
 
