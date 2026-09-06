@@ -10,6 +10,9 @@ import { isApiSuccess } from "@/types/api";
 type CartItem = {
   id: number;
   quantity: number;
+  skuSpecs?: string | null;
+  // SKU 现价（服务端按 skuId 取，无规格=商品价）
+  unitPrice?: string;
   product: {
     id: number;
     name: string;
@@ -141,7 +144,7 @@ export default function CheckoutPage() {
         const key = item.product.sellerId ?? 0;
         shopSubtotals.set(
           key,
-          (shopSubtotals.get(key) ?? 0) + Number(item.product.price) * item.quantity,
+          (shopSubtotals.get(key) ?? 0) + Number(item.unitPrice ?? item.product.price) * item.quantity,
         );
       }
 
@@ -258,10 +261,15 @@ export default function CheckoutPage() {
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-mist text-2xl dark:bg-white/5">
               {item.product.category?.icon ?? "🛍️"}
             </div>
-            <p className="min-w-0 flex-1 truncate text-sm">{item.product.name}</p>
+            <p className="min-w-0 flex-1 truncate text-sm">
+              {item.product.name}
+              {item.skuSpecs && (
+                <span className="ml-1.5 text-xs opacity-50">（{item.skuSpecs}）</span>
+              )}
+            </p>
             <p className="text-sm opacity-60">× {item.quantity}</p>
             <p className="w-24 text-right font-mono text-sm font-semibold">
-              {formatPrice(Number(item.product.price) * item.quantity)}
+              {formatPrice(Number(item.unitPrice ?? item.product.price) * item.quantity)}
             </p>
           </li>
         ))}

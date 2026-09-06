@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { formatPrice } from "@/lib/format";
+import { cartesianSpecCombinations, parseSpecs, parseSkuSpecs, skuSpecText } from "@/lib/sku";
 import type { ApiResponse } from "@/types/api";
 import { isApiSuccess } from "@/types/api";
 
@@ -15,6 +16,8 @@ type Product = {
   status: string;
   categoryId: number;
   images: string | null;
+  specs: string | null;
+  skus: { id: number; specs: string; price: string; stock: number }[];
   seller?: { nickname: string } | null;
   category: { id: number; name: string; icon: string | null } | null;
 };
@@ -77,6 +80,11 @@ function compressImage(file: File): Promise<string> {
   });
 }
 
+// SKU 编辑器状态
+type SpecRow = { name: string; valuesText: string };
+type SkuRow = { key: string; specsText: string; specs: { name: string; value: string }[]; price: string; stock: string };
+const EMPTY_SPEC_ROWS: SpecRow[] = [];
+
 // 商品管理器：商家（自己的）/ 管理员（全部）共用，走 /api/merchant/products
 // 新增表单在顶部；点「编辑」在该商品行下方展开表单，保存/收起即关闭
 export function ProductManager() {
@@ -88,10 +96,42 @@ export function ProductManager() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [formImages, setFormImages] = useState<string[]>([]);
+  const [specRows, setSpecRows] = useState<SpecRow[]>(EMPTY_SPEC_ROWS);
+  const [skuRows, setSkuRows] = useState<SkuRow[]>([]);
+  // 编辑的商品原本是否启用规格（用于判断「清空规格行」= 清空 SKU）
+  const [hadSkus, setHadSkus] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // 规格定义 → 笛卡尔组合生成 SKU 行（保留已填的价格/库存）
+  function generateSkuRows(rows: SpecRow[]) {
+    const defs = rows
+      .filter((row) => row.name.trim() && row.valuesText.trim())
+      .map((row) => ({
+        name: row.name.trim(),
+        values: row.valuesText.split(/[，,]/).map((v) => v.trim()).filter(Boolean),
+      }));
+    if (defs.length === 0) {
+      setSkuRows([]);
+      return;
+    }
+    const combos = cartesianSpecCombinations(defs);
+    setSkuRows((prev) =>
+      combos.map((specs) => {
+        const key = [...specs].map((s) => `${s.name}:${s.value}`).sort().join("|");
+        const existing = prev.find((row) => row.key === key);
+        return {
+          key,
+          specs,
+          specsText: skuSpecText(specs),
+          price: existing?.price ?? "",
+          stock: existing?.stock ?? "",
+        };
+      }),
+    );
+  }
 
   // 查询：名称 / 店铺（客户端过滤，数据已全量加载）
   const filtered = products.filter((product) => {
@@ -131,6 +171,9 @@ export function ProductManager() {
     closeForms();
     setForm({ ...EMPTY_FORM, categoryId: String(categories[0]?.id ?? "") });
     setFormImages([]);
+    setSpecRows([]);
+    setSkuRows([]);
+    setHadSkus(false);
     setError(null);
     setFieldErrors({});
     setShowCreate(true);
@@ -153,6 +196,19 @@ export function ProductManager() {
       status: product.status,
     });
     setFormImages(parseImages(product.images));
+    // 回显规格与 SKU
+    const defs = parseSpecs(product.specs);
+    setHadSkus(product.specs != null);
+    setSpecRows(defs.map((def) => ({ name: def.name, valuesText: def.values.join("，") })));
+    setSkuRows(
+      product.skus.map((sku) => ({
+        key: [...parseSkuSpecs(sku.specs)].map((s) => `${s.name}:${s.value}`).sort().join("|"),
+        specs: parseSkuSpecs(sku.specs),
+        specsText: skuSpecText(parseSkuSpecs(sku.specs)),
+        price: String(sku.price),
+        stock: String(sku.stock),
+      })),
+    );
     setError(null);
     setFieldErrors({});
   }
@@ -199,11 +255,44 @@ export function ProductManager() {
     setError(null);
     setFieldErrors({});
     try {
+      // 组装规格/SKU 载荷：有完整规格行才提交；全部清空且原本有 SKU 则提交空数组=清空规格
+      const defs = specRows
+        .filter((row) => row.name.trim() && row.valuesText.trim())
+        .map((row) => ({
+          name: row.name.trim(),
+          values: row.valuesText.split(/[，,]/).map((v) => v.trim()).filter(Boolean),
+        }));
+      const hasSkuPayload = defs.length > 0 && skuRows.length > 0;
+      const clearingSkus = defs.length === 0 && hadSkus;
+      if (
+        hasSkuPayload &&
+        skuRows.some(
+          (row) => row.price === "" || Number(row.price) <= 0 || row.stock === "" || Number(row.stock) < 0,
+        )
+      ) {
+        setError("请为每个规格组合填写有效的价格和库存");
+        setBusy(false);
+        return;
+      }
+
+      const payload: Record<string, unknown> = { ...form, images: formImages };
+      if (hasSkuPayload) {
+        payload.specs = defs;
+        payload.skus = skuRows.map((row) => ({
+          specs: row.specs,
+          price: Number(row.price),
+          stock: Number(row.stock),
+        }));
+      } else if (clearingSkus) {
+        payload.specs = [];
+        payload.skus = [];
+      }
+
       const url = editingId ? `/api/merchant/products/${editingId}` : "/api/merchant/products";
       const res = await fetch(url, {
         method: editingId ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, images: formImages }),
+        body: JSON.stringify(payload),
       });
       const result = (await res.json()) as ApiResponse;
       if (isApiSuccess(result)) {
@@ -257,23 +346,24 @@ export function ProductManager() {
       />
       <div className="grid gap-3 sm:grid-cols-3">
         <input
-          required
+          required={!skuRows.length}
           type="number"
           min="0"
           step="0.01"
-          placeholder="价格"
+          placeholder={skuRows.length ? "由 SKU 聚合自动维护" : "价格"}
+          disabled={skuRows.length > 0}
           value={form.price}
           onChange={(e) => setForm({ ...form, price: e.target.value })}
-          className={inputClass}
+          className={inputClass + (skuRows.length ? " opacity-40" : "")}
         />
         <input
-          required
           type="number"
           min="0"
-          placeholder="库存"
+          placeholder={skuRows.length ? "由 SKU 聚合自动维护" : "库存"}
+          disabled={skuRows.length > 0}
           value={form.stock}
           onChange={(e) => setForm({ ...form, stock: e.target.value })}
-          className={inputClass}
+          className={inputClass + (skuRows.length ? " opacity-40" : "")}
         />
         <select
           value={form.categoryId}
@@ -294,6 +384,111 @@ export function ProductManager() {
         onChange={(e) => setForm({ ...form, description: e.target.value })}
         className={inputClass}
       />
+
+      {/* 规格 / SKU 编辑器 */}
+      <div className="rounded-lg border border-black/10 p-3 dark:border-white/15">
+        <p className="mb-2 text-sm font-medium">
+          商品规格（可选）
+          <span className="ml-2 text-xs font-normal opacity-50">
+            如 颜色：黑，白 ／ 版本：8+128，12+256 → 自动生成组合，逐个定价定库存
+          </span>
+        </p>
+
+        {specRows.map((row, i) => (
+          <div key={i} className="mb-2 flex items-center gap-2">
+            <input
+              placeholder="规格名（如 颜色）"
+              value={row.name}
+              onChange={(e) =>
+                setSpecRows((prev) => prev.map((r, idx) => (idx === i ? { ...r, name: e.target.value } : r)))
+              }
+              className="w-32 rounded-lg border border-black/15 px-3 py-2 text-sm dark:border-white/20"
+            />
+            <input
+              placeholder="规格值，逗号分隔（如 黑，白）"
+              value={row.valuesText}
+              onChange={(e) =>
+                setSpecRows((prev) => prev.map((r, idx) => (idx === i ? { ...r, valuesText: e.target.value } : r)))
+              }
+              className="min-w-0 flex-1 rounded-lg border border-black/15 px-3 py-2 text-sm dark:border-white/20"
+            />
+            <button
+              type="button"
+              aria-label="删除该规格"
+              onClick={() => {
+                setSpecRows((prev) => prev.filter((_, idx) => idx !== i));
+                setSkuRows([]);
+              }}
+              className="px-2 text-xs opacity-50 hover:text-promo hover:opacity-100"
+            >
+              删除
+            </button>
+          </div>
+        ))}
+
+        <div className="flex flex-wrap gap-2">
+          {specRows.length < 3 && (
+            <button
+              type="button"
+              onClick={() => setSpecRows((prev) => [...prev, { name: "", valuesText: "" }])}
+              className="rounded-full border border-dashed border-black/25 px-4 py-1 text-xs opacity-70 hover:border-promo hover:text-promo dark:border-white/25"
+            >
+              + 添加规格
+            </button>
+          )}
+          {specRows.some((row) => row.name.trim() && row.valuesText.trim()) && (
+            <button
+              type="button"
+              onClick={() => generateSkuRows(specRows)}
+              className="rounded-full bg-ink px-4 py-1 text-xs font-medium text-white hover:bg-ink-soft"
+            >
+              生成 SKU 组合
+            </button>
+          )}
+        </div>
+
+        {skuRows.length > 0 && (
+          <div className="mt-3 space-y-2">
+            {skuRows.map((row) => (
+              <div key={row.key} className="flex flex-wrap items-center gap-2 text-sm">
+                <span className="w-40 shrink-0 truncate rounded bg-mist px-2 py-1.5 text-xs dark:bg-white/10">
+                  {row.specsText}
+                </span>
+                <input
+                  required
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  placeholder="价格"
+                  value={row.price}
+                  onChange={(e) =>
+                    setSkuRows((prev) =>
+                      prev.map((r) => (r.key === row.key ? { ...r, price: e.target.value } : r)),
+                    )
+                  }
+                  className="w-28 rounded-lg border border-black/15 px-3 py-1.5 dark:border-white/20"
+                />
+                <input
+                  required
+                  type="number"
+                  min="0"
+                  placeholder="库存"
+                  value={row.stock}
+                  onChange={(e) =>
+                    setSkuRows((prev) =>
+                      prev.map((r) => (r.key === row.key ? { ...r, stock: e.target.value } : r)),
+                    )
+                  }
+                  className="w-24 rounded-lg border border-black/15 px-3 py-1.5 dark:border-white/20"
+                />
+              </div>
+            ))}
+            <p className="text-xs opacity-45">
+              保存后商品价格显示最低 SKU 价、库存为各 SKU 合计；已有订单的库存扣减/回补都走 SKU
+            </p>
+          </div>
+        )}
+      </div>
 
       {/* 商品图片：上传（自动压缩为 600px 方图）+ 缩略图管理 */}
       <div>

@@ -94,6 +94,7 @@ export async function getProductById(id: number): Promise<
   | (ProductWithCategory & {
       seller: { id: number; nickname: string } | null;
       shop: { id: number; name: string; logo: string | null } | null;
+      skus: { id: number; specs: string; price: string; stock: number }[];
       reviews: ReviewWithUser[];
     })
   | null
@@ -106,6 +107,7 @@ export async function getProductById(id: number): Promise<
         category: true,
         seller: { select: { id: true, nickname: true } },
         shop: { select: { id: true, name: true, logo: true } },
+        skus: { orderBy: { price: "asc" } },
         reviews: {
           orderBy: { createdAt: "desc" },
           take: 20,
@@ -116,6 +118,12 @@ export async function getProductById(id: number): Promise<
     if (!product) return null;
     return {
       ...product,
+      skus: product.skus.map((sku) => ({
+        id: sku.id,
+        specs: sku.specs,
+        price: String(sku.price),
+        stock: sku.stock,
+      })),
       reviews: product.reviews.map((review) => ({
         id: review.id,
         rating: review.rating,

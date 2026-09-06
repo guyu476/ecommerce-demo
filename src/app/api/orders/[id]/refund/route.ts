@@ -101,6 +101,15 @@ export async function POST(request: NextRequest, context: Context) {
             sales: { decrement: item.quantity },
           },
         });
+        if (item.skuId != null) {
+          await tx.sku.update({
+            where: { id: item.skuId },
+            data: {
+              stock: { increment: item.quantity },
+              sales: { decrement: item.quantity },
+            },
+          });
+        }
       }
     });
 

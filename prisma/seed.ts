@@ -412,6 +412,41 @@ async function main() {
     }
   }
 
+  // 旗舰手机加规格 SKU 演示数据（seed-p1：颜色 × 版本，4 组合）
+  // 幂等：已有 SKU 不重复创建；价格/库存聚合随写入维护
+  const flagshipId = productIdByIndex.get(0);
+  if (flagshipId) {
+    const existingSkuCount = await prisma.sku.count({ where: { productId: flagshipId } });
+    if (existingSkuCount === 0) {
+      const flagshipSpecs = [
+        { name: "颜色", values: ["曜石黑", "冰川白"] },
+        { name: "版本", values: ["8+128GB", "12+256GB"] },
+      ];
+      const flagshipSkus = [
+        { specs: [{ name: "颜色", value: "曜石黑" }, { name: "版本", value: "8+128GB" }], price: 3499, stock: 40 },
+        { specs: [{ name: "颜色", value: "冰川白" }, { name: "版本", value: "8+128GB" }], price: 3499, stock: 35 },
+        { specs: [{ name: "颜色", value: "曜石黑" }, { name: "版本", value: "12+256GB" }], price: 3799, stock: 25 },
+        { specs: [{ name: "颜色", value: "冰川白" }, { name: "版本", value: "12+256GB" }], price: 3799, stock: 20 },
+      ];
+      await prisma.sku.createMany({
+        data: flagshipSkus.map((sku) => ({
+          productId: flagshipId,
+          specs: JSON.stringify(sku.specs),
+          price: sku.price,
+          stock: sku.stock,
+        })),
+      });
+      await prisma.product.update({
+        where: { id: flagshipId },
+        data: {
+          specs: JSON.stringify(flagshipSpecs),
+          price: Math.min(...flagshipSkus.map((s) => s.price)),
+          stock: flagshipSkus.reduce((sum, s) => sum + s.stock, 0),
+        },
+      });
+    }
+  }
+
   console.log(
     `种子数据完成：分类 ${categories.length} 个，新写入商品 ${created} 个（共 ${products.length} 条），演示订单 2 笔 + 评价 2 条，商家 2 位（鸟西数码旗舰店 / 优选生活百货），优惠券 ${couponSpecs.length} 张（平台 3 + 店铺 1）`,
   );

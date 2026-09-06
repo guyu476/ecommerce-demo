@@ -5,8 +5,10 @@ import { AddToCartButton } from "@/components/add-to-cart-button";
 import { DbSetupNotice } from "@/components/db-setup-notice";
 import { FavoriteButton } from "@/components/favorite-button";
 import { ProductGallery } from "@/components/product-gallery";
+import { SkuPicker } from "@/components/sku-picker";
 import { formatPrice, formatSales } from "@/lib/format";
 import { getProductById, parseProductImages } from "@/lib/queries";
+import { parseSpecs } from "@/lib/sku";
 
 type Props = PageProps<"/products/[id]">;
 
@@ -98,15 +100,30 @@ export default async function ProductDetailPage({ params }: Props) {
         <div className="flex flex-col gap-5">
           <h1 className="text-2xl font-extrabold leading-8 tracking-tight">{product.name}</h1>
 
-          {/* 海报式价格：小眉毛 + 大字 */}
-          <div>
-            <p className="text-xs tracking-[0.3em] text-promo">到手价</p>
-            <p className="font-mono text-4xl font-black text-promo">{formatPrice(product.price)}</p>
-          </div>
+          {/* 购买区：多规格走规格选择器（含价格/库存/数量），单品走原价格+加购 */}
+          {product.skus.length > 0 ? (
+            <SkuPicker
+              productId={product.id}
+              specDefs={parseSpecs(product.specs)}
+              skus={product.skus.map((sku) => ({
+                id: sku.id,
+                specs: sku.specs,
+                price: String(sku.price),
+                stock: sku.stock,
+              }))}
+            />
+          ) : (
+            <div>
+              <p className="text-xs tracking-[0.3em] text-promo">到手价</p>
+              <p className="font-mono text-4xl font-black text-promo">
+                {formatPrice(product.price)}
+              </p>
+            </div>
+          )}
 
           <ul className="flex gap-5 text-sm opacity-60">
             <li>已售 {formatSales(product.sales)} 件</li>
-            <li>{product.stock > 0 ? "现货" : "暂时缺货"}</li>
+            <li>{product.skus.length > 0 || product.stock > 0 ? "现货" : "暂时缺货"}</li>
             {product.seller && <li>店铺：{product.seller.nickname}</li>}
           </ul>
 
@@ -130,7 +147,9 @@ export default async function ProductDetailPage({ params }: Props) {
           )}
 
           <div className="mt-auto flex items-center gap-3 pt-2">
-            <AddToCartButton productId={product.id} disabled={product.stock <= 0} />
+            {product.skus.length === 0 && (
+              <AddToCartButton productId={product.id} disabled={product.stock <= 0} />
+            )}
             <FavoriteButton productId={product.id} />
           </div>
         </div>

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { ApiError, handleRoute, isPrismaError, ok } from "@/lib/api-response";
 import { requireUser } from "@/lib/auth";
 import { generateOrderNo, groupByShop, hashRequest } from "@/lib/order";
+import { parseSkuSpecs, skuSpecText } from "@/lib/sku";
 import { prisma } from "@/lib/prisma";
 
 // ============ POST /api/orders 下单（从购物车结算，跨店自动拆单） ============
@@ -46,26 +47,65 @@ export async function POST(request: NextRequest) {
           throw new ApiError("请先勾选要结算的商品", 40003, 400);
         }
 
-        // 3. 逐项条件更新扣库存（防超卖），任一失败整体回滚
+        // 2.5 加载 SKU 现价（快照用现价而非加购价；规格已删除则报错让用户重新加购）
+        const skuIds = cartItems.filter((item) => item.skuId > 0).map((item) => item.skuId);
+        const skus = skuIds.length
+          ? await tx.sku.findMany({ where: { id: { in: skuIds } } })
+          : [];
+        const skuById = new Map(skus.map((sku) => [sku.id, sku]));
+        const effectivePriceOf = (item: (typeof cartItems)[number]): {
+          price: string;
+          specsText: string | null;
+        } => {
+          if (item.skuId > 0) {
+            const sku = skuById.get(item.skuId);
+            if (!sku || sku.productId !== item.productId) {
+              throw new ApiError(`商品「${item.product.name}」的规格已失效，请重新加购`, 40902, 409);
+            }
+            return { price: String(sku.price), specsText: skuSpecText(parseSkuSpecs(sku.specs)) };
+          }
+          return { price: String(item.product.price), specsText: item.skuSpecs };
+        };
+
+        // 3. 逐项条件更新扣库存（防超卖）：有 SKU 扣 SKU 库存并同步商品聚合库存，任一失败整体回滚
+        //    销量在支付成功时才增加（下单只是锁库存，未成交不算销量）
         for (const item of cartItems) {
           if (item.product.status !== "ON_SALE") {
             throw new ApiError(`商品「${item.product.name}」已下架`, 40902, 409);
           }
-          const updated = await tx.product.updateMany({
-            where: { id: item.productId, stock: { gte: item.quantity } },
-            data: { stock: { decrement: item.quantity }, sales: { increment: item.quantity } },
-          });
-          if (updated.count === 0) {
-            throw new ApiError(`商品「${item.product.name}」库存不足`, 40902, 409);
+          if (item.skuId > 0) {
+            const updated = await tx.sku.updateMany({
+              where: { id: item.skuId, stock: { gte: item.quantity } },
+              data: { stock: { decrement: item.quantity } },
+            });
+            if (updated.count === 0) {
+              throw new ApiError(`商品「${item.product.name}」库存不足`, 40902, 409);
+            }
+            await tx.product.update({
+              where: { id: item.productId },
+              data: { stock: { decrement: item.quantity } },
+            });
+          } else {
+            const updated = await tx.product.updateMany({
+              where: { id: item.productId, stock: { gte: item.quantity } },
+              data: { stock: { decrement: item.quantity } },
+            });
+            if (updated.count === 0) {
+              throw new ApiError(`商品「${item.product.name}」库存不足`, 40902, 409);
+            }
           }
         }
 
-        // 4. 按商家拆单分组（一店一笔；平台自营归 0 号组）
+        // 支付截止：超时未支付由定时任务自动取消并释放库存
+        const payTimeoutMinutes = Number(process.env.PAY_TIMEOUT_MINUTES ?? 15);
+        const expireAt = new Date(Date.now() + payTimeoutMinutes * 60 * 1000);
+
+        // 4. 按商家拆单分组（一店一笔；平台自营归 0 号组），金额按 SKU 现价合计
         const groups = groupByShop(cartItems);
         const groupTotals = new Map<number, number>();
         for (const [sellerId, items] of groups) {
           const total = items.reduce(
-            (sum, item) => sum + Number(item.product.price) * item.quantity,
+            (sum, item) => sum + Number(effectivePriceOf(item).price) * item.quantity,
             0,
           );
           groupTotals.set(sellerId, total);
@@ -152,16 +192,22 @@ export async function POST(request: NextRequest) {
               userId: user.id,
               totalAmount,
               discountAmount: orderDiscount,
+              expireAt,
               recipientName: body.recipientName,
               recipientPhone: body.recipientPhone,
               shippingAddress: body.shippingAddress,
               items: {
-                create: items.map((item) => ({
-                  productId: item.productId,
-                  name: item.product.name,
-                  price: String(item.product.price),
-                  quantity: item.quantity,
-                })),
+                create: items.map((item) => {
+                  const snapshot = effectivePriceOf(item);
+                  return {
+                    productId: item.productId,
+                    skuId: item.skuId > 0 ? item.skuId : null,
+                    skuSpecs: snapshot.specsText,
+                    name: item.product.name,
+                    price: snapshot.price,
+                    quantity: item.quantity,
+                  };
+                }),
               },
             },
             include: { items: true },

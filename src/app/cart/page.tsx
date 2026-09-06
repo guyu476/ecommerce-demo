@@ -11,6 +11,9 @@ type CartItem = {
   id: number;
   quantity: number;
   checked: boolean;
+  skuSpecs?: string | null;
+  // SKU 现价（服务端按 skuId 取，无规格=商品价）
+  unitPrice?: string;
   product: {
     id: number;
     name: string;
@@ -156,7 +159,7 @@ export default function CartPage() {
   const checkedItems = items.filter((item) => item.checked);
   const checkedQuantity = checkedItems.reduce((sum, item) => sum + item.quantity, 0);
   const checkedTotal = checkedItems.reduce(
-    (sum, item) => sum + Number(item.product.price) * item.quantity,
+    (sum, item) => sum + Number(item.unitPrice ?? item.product.price) * item.quantity,
     0,
   );
   const everythingChecked = !isEmpty && checkedItems.length === items.length;
@@ -202,8 +205,11 @@ export default function CartPage() {
                   >
                     {item.product.name}
                   </Link>
+                  {item.skuSpecs && (
+                    <p className="mt-0.5 text-xs opacity-50">{item.skuSpecs}</p>
+                  )}
                   <p className="mt-1 text-sm font-bold text-red-600 dark:text-red-400">
-                    {formatPrice(item.product.price)}
+                    {formatPrice(item.unitPrice ?? item.product.price)}
                   </p>
                 </div>
 
@@ -230,7 +236,7 @@ export default function CartPage() {
                 </div>
 
                 <p className={`w-24 text-right text-sm font-semibold tabular-nums ${item.checked ? "" : "opacity-40"}`}>
-                  {formatPrice(Number(item.product.price) * item.quantity)}
+                  {formatPrice(Number(item.unitPrice ?? item.product.price) * item.quantity)}
                 </p>
 
                 <button

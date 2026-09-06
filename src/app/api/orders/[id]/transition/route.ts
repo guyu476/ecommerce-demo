@@ -52,6 +52,10 @@ export async function POST(request: NextRequest, context: Context) {
     if (order.status !== from) {
       throw new ApiError(`当前状态（${order.status}）不可执行该操作，需处于 ${from}`, 40905, 409);
     }
+    // 支付时校验支付截止：超时订单等定时任务自动取消，不能再付款
+    if (action === "pay" && order.expireAt && order.expireAt < new Date()) {
+      throw new ApiError("订单已超时未支付，无法付款（稍后自动关闭）", 40905, 409);
+    }
 
     // 条件更新做状态机守卫：并发下只有一个请求生效；按动作补记业务时间戳
     const extraData =
@@ -64,11 +68,32 @@ export async function POST(request: NextRequest, context: Context) {
           ? { paidAt: new Date() }
           : { completedAt: new Date() };
 
-    const updated = await prisma.order.updateMany({
-      where: { id: orderId, status: from },
-      data: { status: to, ...extraData },
+    const updated = await prisma.$transaction(async (tx) => {
+      const result = await tx.order.updateMany({
+        where: { id: orderId, status: from },
+        data: { status: to, ...extraData },
+      });
+      if (result.count === 0) {
+        return null;
+      }
+      // 支付成功才计销量：商品聚合与 SKU 各自增加（此前下单只锁库存）
+      if (action === "pay") {
+        for (const item of order.items) {
+          await tx.product.update({
+            where: { id: item.productId },
+            data: { sales: { increment: item.quantity } },
+          });
+          if (item.skuId != null) {
+            await tx.sku.update({
+              where: { id: item.skuId },
+              data: { sales: { increment: item.quantity } },
+            });
+          }
+        }
+      }
+      return true;
     });
-    if (updated.count === 0) {
+    if (updated === null) {
       throw new ApiError("订单状态已变化，请刷新后重试", 40905, 409);
     }
 

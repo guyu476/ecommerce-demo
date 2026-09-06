@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 import { z } from "zod";
 import { ApiError, handleRoute, ok } from "@/lib/api-response";
 import { requireUser } from "@/lib/auth";
+import { parseSkuSpecs, skuSpecText } from "@/lib/sku";
 import { prisma } from "@/lib/prisma";
 
 // GET /api/cart 当前用户购物车列表（含商品信息与合计）
@@ -19,14 +20,25 @@ export async function GET(request: NextRequest) {
       include: { product: { include: { category: true } } },
     });
 
+    // SKU 现价：有规格的条目按当前 SKU 价格（金额合计/展示均用现价）
+    const skuIds = items.filter((item) => item.skuId > 0).map((item) => item.skuId);
+    const skus = skuIds.length ? await prisma.sku.findMany({ where: { id: { in: skuIds } } }) : [];
+    const skuById = new Map(skus.map((sku) => [sku.id, sku]));
+    const itemsWithPrice = items.map((item) => ({
+      ...item,
+      unitPrice: String(
+        item.skuId > 0 ? (skuById.get(item.skuId)?.price ?? item.product.price) : item.product.price,
+      ),
+    }));
+
     // 合计：数量与金额（Decimal -> number 求和）
-    const totalQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
-    const totalPrice = items.reduce(
-      (sum, item) => sum + Number(item.product.price) * item.quantity,
+    const totalQuantity = itemsWithPrice.reduce((sum, item) => sum + item.quantity, 0);
+    const totalPrice = itemsWithPrice.reduce(
+      (sum, item) => sum + Number(item.unitPrice) * item.quantity,
       0,
     );
 
-    return ok({ items, totalQuantity, totalPrice });
+    return ok({ items: itemsWithPrice, totalQuantity, totalPrice });
   });
 }
 
@@ -49,9 +61,10 @@ export async function PATCH(request: NextRequest) {
   });
 }
 
-// POST /api/cart 加入购物车 { productId, quantity? }；已存在则累加数量
+// POST /api/cart 加入购物车 { productId, skuId?, quantity? }；已存在（同商品同 SKU）则累加数量
 const addBodySchema = z.object({
   productId: z.coerce.number().int().positive(),
+  skuId: z.coerce.number().int().positive().optional(),
   quantity: z.coerce.number().int().min(1).max(99).default(1),
 });
 
@@ -62,24 +75,51 @@ export async function POST(request: NextRequest) {
 
     const product = await prisma.product.findUnique({
       where: { id: body.productId },
-      select: { id: true, status: true, stock: true },
+      include: { skus: body.skuId ? { where: { id: body.skuId } } : false },
     });
     if (!product || product.status !== "ON_SALE") {
       throw new ApiError("商品不存在或已下架", 40401, 404);
     }
 
+    // SKU 归属与库存判定
+    let skuId = 0;
+    let skuSpecs: string | null = null;
+    let stockCap = product.stock;
+    if (product.specs != null) {
+      const sku = body.skuId ? product.skus[0] : undefined;
+      if (!sku) {
+        throw new ApiError("请先选择商品规格", 42202, 422);
+      }
+      skuId = sku.id;
+      skuSpecs = skuSpecText(parseSkuSpecs(sku.specs));
+      stockCap = sku.stock;
+    } else if (body.skuId) {
+      throw new ApiError("该商品无规格，无需选择 SKU", 42202, 422);
+    }
+    if (stockCap <= 0) {
+      throw new ApiError("商品库存不足", 40902, 409);
+    }
+
     const existing = await prisma.cartItem.findUnique({
-      where: { userId_productId: { userId: user.id, productId: body.productId } },
+      where: { userId_productId_skuId: { userId: user.id, productId: body.productId, skuId } },
     });
 
-    const quantity = existing
-      ? Math.min(existing.quantity + body.quantity, product.stock)
-      : Math.min(body.quantity, product.stock);
+    const quantity = Math.min(
+      existing ? existing.quantity + body.quantity : body.quantity,
+      stockCap,
+      99,
+    );
 
     const item = await prisma.cartItem.upsert({
-      where: { userId_productId: { userId: user.id, productId: body.productId } },
-      update: { quantity },
-      create: { userId: user.id, productId: body.productId, quantity },
+      where: { userId_productId_skuId: { userId: user.id, productId: body.productId, skuId } },
+      update: { quantity, checked: true },
+      create: {
+        userId: user.id,
+        productId: body.productId,
+        skuId,
+        skuSpecs,
+        quantity,
+      },
       include: { product: { include: { category: true } } },
     });
 

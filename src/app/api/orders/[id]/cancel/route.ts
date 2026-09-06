@@ -36,15 +36,18 @@ export async function POST(_request: NextRequest, context: Context) {
         throw new ApiError("当前状态不可取消", 40904, 409);
       }
 
-      // 恢复库存与销量
+      // 恢复库存：下单只锁库存未计销量，取消只回补库存（SKU 与商品聚合各回各的）
       for (const item of order.items) {
         await tx.product.update({
           where: { id: item.productId },
-          data: {
-            stock: { increment: item.quantity },
-            sales: { decrement: item.quantity },
-          },
+          data: { stock: { increment: item.quantity } },
         });
+        if (item.skuId != null) {
+          await tx.sku.update({
+            where: { id: item.skuId },
+            data: { stock: { increment: item.quantity } },
+          });
+        }
       }
     });
 

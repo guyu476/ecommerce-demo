@@ -68,12 +68,16 @@ model CartItem {
   productId Int      @map("product_id")
   product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
   quantity  Int      @default(1)
+  // SKU：0 = 无规格单品；同一商品不同 SKU 各占一条
+  skuId     Int      @default(0) @map("sku_id")
+  // 加购时的规格文本快照（如「黑色 / 8+128」），展示用不回查
+  skuSpecs  String?  @map("sku_specs") @db.VarChar(200)
   // 结算勾选：勾中的才随下单结算（全选/单选都在此字段持久化）
   checked   Boolean  @default(true) @map("checked")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  @@unique([userId, productId])
+  @@unique([userId, productId, skuId])
   @@map("cart_items")
 }
 
@@ -104,12 +108,15 @@ model Product {
   id          Int           @id @default(autoincrement())
   name        String        @db.VarChar(200)
   description String?       @db.Text
+  // 无规格商品：price/stock 即实际值；有 SKU 商品：price=最低 SKU 价（写入时维护）、stock=SKU 库存合计
   price       Decimal       @db.Decimal(10, 2)
   image       String?       @db.VarChar(500)
   images      String?       @db.MediumText
   stock       Int           @default(0)
   sales       Int           @default(0)
   status      ProductStatus @default(DRAFT)
+  // 规格定义 JSON：[{"name":"颜色","values":["黑","白"]},{"name":"版本","values":["8+128"]}]；空=无规格单品
+  specs       String?       @db.MediumText
   // 种子幂等键：seed 数据按此键去重（商品名可被商家修改，不能当幂等键）
   seedKey     String?       @unique @map("seed_key") @db.VarChar(40)
   categoryId  Int?
@@ -124,11 +131,27 @@ model Product {
   orderItems  OrderItem[]
   reviews     Review[]
   favorites   Favorite[]
+  skus        Sku[]
 
   @@index([categoryId])
   @@index([status])
   @@index([shopId])
   @@map("products")
+}
+
+// SKU：规格组合的最小销售单元，价格/库存/销量都按 SKU 维护
+model Sku {
+  id        Int     @id @default(autoincrement())
+  productId Int     @map("product_id")
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  // 规格取值 JSON：[{"name":"颜色","value":"黑"},{"name":"版本","value":"8+128"}]
+  specs     String  @db.VarChar(500)
+  price     Decimal @db.Decimal(10, 2)
+  stock     Int     @default(0)
+  sales     Int     @default(0)
+
+  @@index([productId])
+  @@map("product_skus")
 }
 
 // 收藏夹：商品详情页心形按钮，一用户一商品一条
@@ -241,6 +264,8 @@ model Order {
   refundAmount    Decimal?     @map("refund_amount") @db.Decimal(10, 2)
   refundHandledAt DateTime?    @map("refund_handled_at")
   trackingNo      String?      @map("tracking_no") @db.VarChar(64)
+  // 支付截止：待付款订单超时未支付由定时任务自动取消并释放库存
+  expireAt        DateTime?    @map("expire_at")
   paidAt          DateTime?    @map("paid_at")
   shippedAt       DateTime?    @map("shipped_at")
   completedAt     DateTime?    @map("completed_at")
@@ -267,6 +292,10 @@ model OrderItem {
   order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
   productId Int      @map("product_id")
   product   Product  @relation(fields: [productId], references: [id])
+  // SKU：null = 无规格单品（历史数据兼容）
+  skuId     Int?     @map("sku_id")
+  // 规格文本快照（如「黑色 / 8+128」）
+  skuSpecs  String?  @map("sku_specs") @db.VarChar(200)
   name      String   @map("product_name") @db.VarChar(200)
   price     Decimal  @map("unit_price") @db.Decimal(10, 2)
   quantity  Int

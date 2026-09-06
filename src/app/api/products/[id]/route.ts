@@ -25,6 +25,7 @@ export async function GET(_request: NextRequest, context: Context) {
       where: { id: parseId(id) },
       include: {
         category: true,
+        skus: { orderBy: { price: "asc" } },
         reviews: {
           orderBy: { createdAt: "desc" },
           include: { user: { select: { nickname: true, avatar: true } } },

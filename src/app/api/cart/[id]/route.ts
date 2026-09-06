@@ -18,6 +18,19 @@ async function getOwnedItem(itemId: number, userId: number) {
   return item;
 }
 
+// 数量上限：有 SKU 的按 SKU 库存，无规格的按商品库存（软上限 99 之外再夹一层）
+async function stockCapOf(item: { productId: number; skuId: number }): Promise<number> {
+  if (item.skuId > 0) {
+    const sku = await prisma.sku.findUnique({ where: { id: item.skuId } });
+    return sku?.stock ?? 0;
+  }
+  const product = await prisma.product.findUnique({
+    where: { id: item.productId },
+    select: { stock: true },
+  });
+  return product?.stock ?? 0;
+}
+
 // PATCH /api/cart/[id] 修改数量 { quantity } 或勾选状态 { checked }（至少传一个）
 const updateBodySchema = z
   .object({
@@ -35,10 +48,20 @@ export async function PATCH(request: NextRequest, context: Context) {
     const item = await getOwnedItem(idSchema.parse(id), user.id);
     const body = updateBodySchema.parse(await request.json());
 
+    // 数量修改：夹到当前 SKU/商品的实际库存内（库存可能已被别的订单消耗）
+    let quantity = body.quantity;
+    if (quantity !== undefined) {
+      const cap = await stockCapOf(item);
+      if (cap <= 0) {
+        throw new ApiError("商品库存不足", 40902, 409);
+      }
+      quantity = Math.min(quantity, cap);
+    }
+
     const updated = await prisma.cartItem.update({
       where: { id: item.id },
       data: {
-        ...(body.quantity !== undefined ? { quantity: body.quantity } : {}),
+        ...(quantity !== undefined ? { quantity } : {}),
         ...(body.checked !== undefined ? { checked: body.checked } : {}),
       },
       include: { product: { include: { category: true } } },

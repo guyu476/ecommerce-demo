@@ -13,6 +13,7 @@ type OrderItem = {
   name: string;
   price: string;
   quantity: number;
+  skuSpecs?: string | null;
 };
 
 type Order = {
@@ -24,11 +25,32 @@ type Order = {
   trackingNo: string | null;
   refundStatus: string;
   refundReason: string | null;
+  expireAt: string | null;
   coupon: { coupon: { title: string; discount: string } } | null;
   createdAt: string;
   items: OrderItem[];
   reviews: { productId: number }[];
 };
+
+// 待付款倒计时：超时后提示即将自动取消（定时任务每分钟清理）
+function PayCountdown({ expireAt }: { expireAt: string }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+  const msLeft = new Date(expireAt).getTime() - now;
+  if (msLeft <= 0) {
+    return <span className="ml-2 text-promo">已超时，即将自动取消</span>;
+  }
+  const minutes = Math.floor(msLeft / 60000);
+  const seconds = Math.floor((msLeft % 60000) / 1000);
+  return (
+    <span className="ml-2 font-mono">
+      ⏰ 支付剩余 {minutes}:{String(seconds).padStart(2, "0")}
+    </span>
+  );
+}
 
 const STATUS_LABEL: Record<string, string> = {
   PENDING_PAYMENT: "待付款",
@@ -301,6 +323,9 @@ export default function OrdersPage() {
                   <span className="font-mono opacity-70">单号 {order.orderNo}</span>
                   <span className={STATUS_STYLE[order.status] ?? ""}>
                     {STATUS_LABEL[order.status] ?? order.status}
+                    {order.status === "PENDING_PAYMENT" && order.expireAt && (
+                      <PayCountdown expireAt={order.expireAt} />
+                    )}
                     {canReview(order) && pending.length > 0 && (
                       <span className="ml-2 rounded bg-market px-1.5 py-0.5 text-[10px] text-ink">
                         待评价
@@ -342,7 +367,12 @@ export default function OrdersPage() {
                     return (
                       <li key={item.id} className="px-5 py-3">
                         <div className="flex items-center gap-3 text-sm">
-                          <span className="min-w-0 flex-1 truncate">{item.name}</span>
+                          <span className="min-w-0 flex-1 truncate">
+                            {item.name}
+                            {item.skuSpecs && (
+                              <span className="ml-1.5 text-xs opacity-50">（{item.skuSpecs}）</span>
+                            )}
+                          </span>
                           <span className="font-mono opacity-60">
                             {formatPrice(item.price)} × {item.quantity}
                           </span>
