@@ -1,15 +1,22 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useToast } from "@/components/toast";
 import { parseSkuSpecs, skuSpecText } from "@/lib/sku";
 import type { ApiResponse } from "@/types/api";
 import { isApiSuccess } from "@/types/api";
 
 export type SpecDef = { name: string; values: string[] };
-export type SkuLite = { id: number; specs: string; price: string; stock: number };
+export type SkuLite = {
+  id: number;
+  specs: string;
+  price: string;
+  stock: number;
+  image?: string | null;
+};
 
 // 规格选择器 + 加购：多规格商品的购买区（无规格商品仍走 AddToCartButton）
+// 选中完整组合后广播 sku-image 事件，商品相册联动切到该 SKU 的配图
 export function SkuPicker({
   productId,
   specDefs,
@@ -39,6 +46,13 @@ export function SkuPicker({
       ) ?? null
     );
   }, [parsedSkus, selected, specDefs]);
+
+  // 相册联动：组合配图变化时通知 ProductGallery
+  useEffect(() => {
+    window.dispatchEvent(
+      new CustomEvent("sku-image", { detail: { image: matchedSku?.image || null } }),
+    );
+  }, [matchedSku]);
 
   const minPrice = Math.min(...skus.map((sku) => Number(sku.price)));
   const totalStock = skus.reduce((sum, sku) => sum + sku.stock, 0);

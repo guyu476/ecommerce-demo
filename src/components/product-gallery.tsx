@@ -1,20 +1,50 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
 // 商品多图相册：主图左右箭头切换 + 缩略图 + 点击放大（灯箱）
 // 图片数量 = 商家上传数量；未上传时显示浅黑色占位
+// 规格联动：监听 sku-image 事件——选中带配图的规格组合时自动切到该图，取消选择恢复
 export function ProductGallery({ images }: { images: string[] }) {
   const [active, setActive] = useState(0);
   const [zoomed, setZoomed] = useState(false);
+  // 规格联动覆盖图：选中的 SKU 配图不在商品图列表里时直接展示它
+  const [override, setOverride] = useState<string | null>(null);
+
+  useEffect(() => {
+    function onSkuImage(event: Event) {
+      const image = (event as CustomEvent<{ image: string | null }>).detail?.image ?? null;
+      if (image) {
+        const index = images.indexOf(image);
+        if (index >= 0) {
+          setOverride(null);
+          setActive(index);
+        } else {
+          setOverride(image);
+        }
+      } else {
+        setOverride(null);
+      }
+    }
+    window.addEventListener("sku-image", onSkuImage);
+    return () => window.removeEventListener("sku-image", onSkuImage);
+  }, [images]);
 
   if (images.length === 0) {
     return <div className="aspect-square rounded-md bg-zinc-800" />;
   }
 
-  const prev = () => setActive((i) => (i - 1 + images.length) % images.length);
-  const next = () => setActive((i) => (i + 1) % images.length);
+  const current = override ?? images[active];
+
+  const prev = () => {
+    setOverride(null);
+    setActive((i) => (i - 1 + images.length) % images.length);
+  };
+  const next = () => {
+    setOverride(null);
+    setActive((i) => (i + 1) % images.length);
+  };
 
   const arrowClass =
     "absolute top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/35 text-lg text-white backdrop-blur transition-colors hover:bg-black/55";
@@ -24,7 +54,7 @@ export function ProductGallery({ images }: { images: string[] }) {
       <div className="relative aspect-square overflow-hidden rounded-md bg-zinc-800">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={images[active]}
+          src={current}
           alt={`商品图 ${active + 1}`}
           onClick={() => setZoomed(true)}
           className="h-full w-full cursor-zoom-in object-cover"
@@ -84,7 +114,7 @@ export function ProductGallery({ images }: { images: string[] }) {
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={images[active]}
+              src={current}
               alt={`商品大图 ${active + 1}`}
               className="h-[min(92vmin,860px)] w-[min(92vmin,860px)] rounded-lg bg-white/5 object-contain shadow-2xl"
             />

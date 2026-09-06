@@ -30,6 +30,15 @@ export const skuInputSchema = z.object({
     .max(3),
   price: z.coerce.number().min(0.01, "SKU 价格必须大于 0"),
   stock: z.coerce.number().int().min(0, "SKU 库存不能为负").max(999999),
+  // 该组合的实拍图（本站路径或 data URL），可选
+  image: z
+    .string()
+    .trim()
+    .max(500)
+    .refine((v) => v === "" || v.startsWith("/") || v.startsWith("data:image/"), {
+      message: "SKU 图片仅支持本站路径或 data URL",
+    })
+    .optional(),
 });
 
 export const skusSchema = z
@@ -82,6 +91,7 @@ export async function applySkus(
       specs: JSON.stringify(sku.specs),
       price: sku.price,
       stock: sku.stock,
+      image: sku.image || null,
     })),
   });
 

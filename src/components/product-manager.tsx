@@ -82,7 +82,14 @@ function compressImage(file: File): Promise<string> {
 
 // SKU 编辑器状态
 type SpecRow = { name: string; valuesText: string };
-type SkuRow = { key: string; specsText: string; specs: { name: string; value: string }[]; price: string; stock: string };
+type SkuRow = {
+  key: string;
+  specsText: string;
+  specs: { name: string; value: string }[];
+  price: string;
+  stock: string;
+  image: string; // 该组合的实拍图（从商品已上传图中选）；空=未指派
+};
 const EMPTY_SPEC_ROWS: SpecRow[] = [];
 
 // 商品管理器：商家（自己的）/ 管理员（全部）共用，走 /api/merchant/products
@@ -128,6 +135,7 @@ export function ProductManager() {
           specsText: skuSpecText(specs),
           price: existing?.price ?? "",
           stock: existing?.stock ?? "",
+          image: existing?.image ?? "",
         };
       }),
     );
@@ -207,6 +215,7 @@ export function ProductManager() {
         specsText: skuSpecText(parseSkuSpecs(sku.specs)),
         price: String(sku.price),
         stock: String(sku.stock),
+        image: (sku as { image?: string | null }).image ?? "",
       })),
     );
     setError(null);
@@ -282,6 +291,7 @@ export function ProductManager() {
           specs: row.specs,
           price: Number(row.price),
           stock: Number(row.stock),
+          image: row.image || "",
         }));
       } else if (clearingSkus) {
         payload.specs = [];
@@ -448,39 +458,77 @@ export function ProductManager() {
         </div>
 
         {skuRows.length > 0 && (
-          <div className="mt-3 space-y-2">
+          <div className="space-y-2">
             {skuRows.map((row) => (
-              <div key={row.key} className="flex flex-wrap items-center gap-2 text-sm">
-                <span className="w-40 shrink-0 truncate rounded bg-mist px-2 py-1.5 text-xs dark:bg-white/10">
-                  {row.specsText}
-                </span>
-                <input
-                  required
-                  type="number"
-                  min="0.01"
-                  step="0.01"
-                  placeholder="价格"
-                  value={row.price}
-                  onChange={(e) =>
-                    setSkuRows((prev) =>
-                      prev.map((r) => (r.key === row.key ? { ...r, price: e.target.value } : r)),
-                    )
-                  }
-                  className="w-28 rounded-lg border border-black/15 px-3 py-1.5 dark:border-white/20"
-                />
-                <input
-                  required
-                  type="number"
-                  min="0"
-                  placeholder="库存"
-                  value={row.stock}
-                  onChange={(e) =>
-                    setSkuRows((prev) =>
-                      prev.map((r) => (r.key === row.key ? { ...r, stock: e.target.value } : r)),
-                    )
-                  }
-                  className="w-24 rounded-lg border border-black/15 px-3 py-1.5 dark:border-white/20"
-                />
+              <div
+                key={row.key}
+                className="rounded-lg border border-black/10 p-2.5 dark:border-white/15"
+              >
+                <div className="flex flex-wrap items-center gap-2 text-sm">
+                  <span className="w-40 shrink-0 truncate rounded bg-mist px-2 py-1.5 text-xs dark:bg-white/10">
+                    {row.specsText}
+                  </span>
+                  <input
+                    required
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    placeholder="价格"
+                    value={row.price}
+                    onChange={(e) =>
+                      setSkuRows((prev) =>
+                        prev.map((r) => (r.key === row.key ? { ...r, price: e.target.value } : r)),
+                      )
+                    }
+                    className="w-28 rounded-lg border border-black/15 px-3 py-1.5 dark:border-white/20"
+                  />
+                  <input
+                    required
+                    type="number"
+                    min="0"
+                    placeholder="库存"
+                    value={row.stock}
+                    onChange={(e) =>
+                      setSkuRows((prev) =>
+                        prev.map((r) => (r.key === row.key ? { ...r, stock: e.target.value } : r)),
+                      )
+                    }
+                    className="w-24 rounded-lg border border-black/15 px-3 py-1.5 dark:border-white/20"
+                  />
+                </div>
+                {/* 组合配图：从已上传商品图中点选，买家选到该规格时相册自动切换 */}
+                {formImages.length > 0 && (
+                  <div className="mt-2 flex items-center gap-2">
+                    <span className="shrink-0 text-xs opacity-50">配图：</span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {formImages.map((image) => {
+                        const assigned = row.image === image;
+                        return (
+                          <button
+                            key={image}
+                            type="button"
+                            aria-pressed={assigned}
+                            aria-label={`指派配图 ${assigned ? "（当前）" : ""}`}
+                            onClick={() =>
+                              setSkuRows((prev) =>
+                                prev.map((r) =>
+                                  r.key === row.key ? { ...r, image: assigned ? "" : image } : r,
+                                ),
+                              )
+                            }
+                            className={`relative h-10 w-10 overflow-hidden rounded border-2 transition-all ${
+                              assigned ? "border-promo" : "border-transparent opacity-60 hover:opacity-100"
+                            }`}
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={image} alt="" className="h-full w-full object-cover" />
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {row.image && <span className="text-xs text-promo">✓ 已指派</span>}
+                  </div>
+                )}
               </div>
             ))}
             <p className="text-xs opacity-45">

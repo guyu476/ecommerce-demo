@@ -149,6 +149,8 @@ model Sku {
   price     Decimal @db.Decimal(10, 2)
   stock     Int     @default(0)
   sales     Int     @default(0)
+  // 该规格组合的实拍图（选规格时相册联动切换）；空=用商品主图
+  image     String? @db.VarChar(500)
 
   @@index([productId])
   @@map("product_skus")

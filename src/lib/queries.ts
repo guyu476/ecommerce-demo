@@ -94,7 +94,7 @@ export async function getProductById(id: number): Promise<
   | (ProductWithCategory & {
       seller: { id: number; nickname: string } | null;
       shop: { id: number; name: string; logo: string | null } | null;
-      skus: { id: number; specs: string; price: string; stock: number }[];
+      skus: { id: number; specs: string; price: string; stock: number; image: string | null }[];
       reviews: ReviewWithUser[];
     })
   | null
@@ -123,6 +123,7 @@ export async function getProductById(id: number): Promise<
         specs: sku.specs,
         price: String(sku.price),
         stock: sku.stock,
+        image: sku.image,
       })),
       reviews: product.reviews.map((review) => ({
         id: review.id,

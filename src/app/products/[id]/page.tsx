@@ -102,16 +102,17 @@ export default async function ProductDetailPage({ params }: Props) {
 
           {/* 购买区：多规格走规格选择器（含价格/库存/数量），单品走原价格+加购 */}
           {product.skus.length > 0 ? (
-            <SkuPicker
-              productId={product.id}
-              specDefs={parseSpecs(product.specs)}
-              skus={product.skus.map((sku) => ({
-                id: sku.id,
-                specs: sku.specs,
-                price: String(sku.price),
-                stock: sku.stock,
-              }))}
-            />
+              <SkuPicker
+                productId={product.id}
+                specDefs={parseSpecs(product.specs)}
+                skus={product.skus.map((sku) => ({
+                  id: sku.id,
+                  specs: sku.specs,
+                  price: String(sku.price),
+                  stock: sku.stock,
+                  image: sku.image,
+                }))}
+              />
           ) : (
             <div>
               <p className="text-xs tracking-[0.3em] text-promo">到手价</p>
