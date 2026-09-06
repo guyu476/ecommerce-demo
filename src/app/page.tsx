@@ -49,6 +49,7 @@ function CategoryTicket({
   return (
     <Link
       href={href}
+      scroll={false}
       className={`relative inline-flex items-center gap-2 rounded-lg border-2 px-5 py-2.5 text-sm font-medium transition-all ${
         active
           ? "border-ink bg-ink text-white shadow-lg"
@@ -232,6 +233,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
                         sort: option.value === "default" ? undefined : option.value,
                         page: undefined,
                       })}
+                      scroll={false}
                       className={`inline-block rounded-full px-3.5 py-1.5 transition-colors ${
                         sort === option.value
                           ? "bg-promo text-white"
