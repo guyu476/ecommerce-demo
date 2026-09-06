@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { useToast } from "@/components/toast";
 import { formatPrice } from "@/lib/format";
+import { parseProductImagesPure } from "@/lib/product-images";
 import type { ApiResponse } from "@/types/api";
 import { isApiSuccess } from "@/types/api";
 
@@ -20,6 +21,7 @@ type CartItem = {
     name: string;
     price: string;
     stock: number;
+    images: string | null;
     category: { id: number; name: string; icon: string | null } | null;
   };
 };
@@ -218,8 +220,18 @@ export default function CartPage() {
                   disabled={busyId === item.id}
                   onToggle={() => toggleChecked(item.id, !item.checked)}
                 />
-                <div className={`flex h-16 w-16 shrink-0 items-center justify-center rounded-lg bg-mist text-3xl ${item.checked ? "" : "opacity-40"}`}>
-                  {item.product.category?.icon ?? "🛍️"}
+                {/* 商品实拍图：无图时回退分类 emoji */}
+                <div className={`flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-mist text-3xl ${item.checked ? "" : "opacity-40"}`}>
+                  {parseProductImagesPure(item.product.images)[0] ? (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img
+                      src={parseProductImagesPure(item.product.images)[0]}
+                      alt={item.product.name}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    item.product.category?.icon ?? "🛍️"
+                  )}
                 </div>
 
                 <div className={`min-w-0 flex-1 ${item.checked ? "" : "opacity-50"}`}>

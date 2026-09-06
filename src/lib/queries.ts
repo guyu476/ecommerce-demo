@@ -199,13 +199,5 @@ export async function getHomepageCoupons(): Promise<
   }
 }
 
-/** 解析商品多图（JSON 数组），空/损坏时返回空数组 */
-export function parseProductImages(images: string | null): string[] {
-  if (!images) return [];
-  try {
-    const parsed = JSON.parse(images);
-    return Array.isArray(parsed) ? parsed.filter((x) => typeof x === "string") : [];
-  } catch {
-    return [];
-  }
-}
+/** 解析商品多图（JSON 数组），空/损坏时返回空数组（实现见 lib/product-images） */
+export { parseProductImagesPure as parseProductImages } from "@/lib/product-images";

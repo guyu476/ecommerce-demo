@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { formatPrice } from "@/lib/format";
+import { parseProductImagesPure } from "@/lib/product-images";
 import type { ApiResponse } from "@/types/api";
 import { isApiSuccess } from "@/types/api";
 
@@ -17,6 +18,7 @@ type CartItem = {
     id: number;
     name: string;
     price: string;
+    images: string | null;
     sellerId: number | null;
     category: { icon: string | null } | null;
   };
@@ -258,8 +260,17 @@ export default function CheckoutPage() {
       <ul className="mb-6 divide-y divide-black/10 rounded-xl border border-black/10 dark:divide-white/10 dark:border-white/15">
         {cart.items.map((item) => (
           <li key={item.id} className="flex items-center gap-4 p-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-mist text-2xl dark:bg-white/5">
-              {item.product.category?.icon ?? "🛍️"}
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-mist text-2xl dark:bg-white/5">
+              {parseProductImagesPure(item.product.images)[0] ? (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img
+                  src={parseProductImagesPure(item.product.images)[0]}
+                  alt={item.product.name}
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                item.product.category?.icon ?? "🛍️"
+              )}
             </div>
             <p className="min-w-0 flex-1 truncate text-sm">
               {item.product.name}
