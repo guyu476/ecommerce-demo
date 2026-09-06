@@ -10,10 +10,9 @@ const TEAR_THRESHOLD = 90;
 const CLIP_STEPS = 8;
 const DEBRIS_COLORS = ["#ffffff", "#e63946", "#fca311", "#14213d"];
 
-// 撕票根（Verlet 物理版）：参考 dissimulate/Tearable-Cloth 的约束撕裂思路——
-// 已撕开的半边是挂在撕口上的「摆」，有重力/惯性/阻尼，手指的速度会把它甩起来；
-// 拉力过大时约束崩断，纸片带着当前惯性自由落体翻滚。撕声为 WebAudio 实时合成。
-// 尊重 prefers-reduced-motion：不做动画，直接加购。
+// 撕票根（Verlet 物理版）：已撕开的半边是挂在撕口上的「摆」，有重力/惯性/阻尼；
+// 撕口随拖拽渐进推进，拉满（或甩太狠弯折过限）约束崩断 → 整块带着惯性飞走。
+// 约束崩断 = 加购（唯一触发点，三条路径汇合：拖满 / 甩断 / 键盘直撕）。
 
 function prefersReduced(): boolean {
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -93,7 +92,7 @@ export function TearStub({
   sales: number;
 }) {
   const toast = useToast();
-  const [view, setView] = useState({ p: 0, theta: 0, freeX: 0, freeY: 0, freeRot: 0 });
+  const [view, setView] = useState({ p: 0, theta: 0, x: 0, y: 0, rot: 0 });
   const [dragging, setDragging] = useState(false);
   const [phase, setPhase] = useState<"idle" | "torn">("idle");
   const [added, setAdded] = useState(false);
@@ -101,15 +100,29 @@ export function TearStub({
   const lastX = useRef<number | null>(null);
   const busy = useRef(false);
   const clips = useRef(makeTearClips());
-  // 物理状态：p 撕口进度；theta/omega 悬垂摆；free* 崩断后的自由落体
-  const phys = useRef({ p: 0, pTarget: 0, theta: 0, omega: 0, x: 0, y: 0, vx: 0, vy: 0, rot: 0, vr: 3, raf: 0, running: false, snapped: false });
+  // 物理状态：p 撕口进度（弹簧式追赶 pTarget）；theta/omega 悬垂摆；snapped 后自由落体
+  const phys = useRef({
+    p: 0,
+    pTarget: 0,
+    theta: 0,
+    omega: 0,
+    x: 0,
+    y: 0,
+    vx: 0,
+    vy: 0,
+    rot: 0,
+    vr: 0,
+    raf: 0,
+    running: false,
+    snapped: false,
+  });
   const rootRef = useRef<HTMLDivElement>(null);
   const looseRef = useRef<HTMLDivElement>(null);
   const debrisRef = useRef<HTMLDivElement>(null);
   const stampRef = useRef<HTMLSpanElement>(null);
 
   const progress = Math.min(1, view.p);
-  const atThreshold = progress >= 1 || phys.current.snapped;
+  const snapped = phys.current.snapped;
 
   async function addToCart(): Promise<boolean> {
     try {
@@ -146,8 +159,48 @@ export function TearStub({
     );
   }
 
-  /** Verlet 主循环：只在交互期间跑（拖拽/摆动/自由落体），静止即停 */
-  function startPhysics(onSnap: () => void, onSettle: () => void) {
+  /** 约束崩断（唯一加购触发点）：纸片带惯性自由落体翻滚，同时调加购接口 */
+  function snapNow() {
+    const s = phys.current;
+    if (s.snapped || busy.current) return;
+    s.snapped = true;
+    s.vx = 130 + Math.abs(s.omega) * 220;
+    s.vy = -50;
+    s.vr = 2.5 + s.omega * 3;
+    if (!prefersReduced()) {
+      if (debrisRef.current) burstDebris(debrisRef.current);
+      shake(rootRef.current);
+    }
+
+    void addToCart().then((ok) => {
+      if (ok) slamStamp();
+      setAdded(true);
+    });
+
+    window.setTimeout(() => {
+      looseRef.current?.getAnimations({ subtree: true }).forEach((a) => a.cancel());
+      Object.assign(s, {
+        p: 0,
+        pTarget: 0,
+        theta: 0,
+        omega: 0,
+        x: 0,
+        y: 0,
+        vx: 0,
+        vy: 0,
+        rot: 0,
+        vr: 0,
+        snapped: false,
+      });
+      setView({ p: 0, theta: 0, x: 0, y: 0, rot: 0 });
+      setPhase("idle");
+      setAdded(false);
+      busy.current = false;
+    }, 1500);
+  }
+
+  /** Verlet 主循环：拖拽/摆动/自由落体期间运行，静止或飞出视野即停 */
+  function startPhysicsLoop(onSettle: () => void) {
     const s = phys.current;
     if (s.running) return;
     s.running = true;
@@ -158,19 +211,15 @@ export function TearStub({
       last = now;
 
       if (!s.snapped) {
-        // 撕口追踪拖拽目标（弹簧式追赶）
+        // 撕口弹簧式追赶拖拽目标
         s.p += (s.pTarget - s.p) * 0.35;
-        // 悬垂摆：重力回复 + 手速注入角速度 + 阻尼
-        const acc = -7.5 * Math.sin(s.theta) - s.omega * 1.6;
+        // 悬垂摆：重力回复 + 微下沉 + 阻尼
+        const acc = -6 * Math.sin(s.theta) - s.omega * 1.5 + 0.9 * (1 - s.p);
         s.omega += acc * dt;
         s.theta += s.omega * dt;
-        if (s.theta < -0.85 && s.p > 0.45) {
-          // 纸弯折过头：约束崩断 → 脱离
-          s.snapped = true;
-          s.vx = s.omega * 260;
-          s.vy = -Math.abs(s.omega) * 60;
-          s.vr = s.omega * 4;
-          onSnap();
+        // 约束崩断条件：撕口拉满，或纸被甩得弯折过限（此时必然撕口过半）
+        if (s.p >= 0.995 || (Math.abs(s.theta) > 0.8 && s.p > 0.3)) {
+          snapNow();
         }
       } else {
         // 自由落体 + 翻滚
@@ -180,7 +229,7 @@ export function TearStub({
         s.rot += s.vr * dt;
       }
 
-      setView({ p: s.p, theta: s.theta, freeX: s.x, freeY: s.y, freeRot: s.rot });
+      setView({ p: s.p, theta: s.theta, x: s.x, y: s.y, rot: s.rot });
 
       const settled =
         !s.snapped && Math.abs(s.p - s.pTarget) < 0.002 && Math.abs(s.theta) < 0.002 && Math.abs(s.omega) < 0.002;
@@ -196,40 +245,10 @@ export function TearStub({
     s.raf = requestAnimationFrame(tick);
   }
 
-  async function handleTear() {
-    if (busy.current) return;
-    busy.current = true;
-    setPhase("torn");
-    const s = phys.current;
-    s.snapped = true;
-    s.vx = 120 + Math.abs(s.omega) * 200;
-    s.vy = -40;
-    s.vr = 3 + s.omega * 3;
-
-    if (!prefersReduced()) {
-      if (debrisRef.current) burstDebris(debrisRef.current);
-      shake(rootRef.current);
-      startPhysics(() => {}, () => {});
-    }
-
-    const ok = await addToCart();
-    if (ok) slamStamp();
-    setAdded(true);
-
-    window.setTimeout(() => {
-      looseRef.current?.getAnimations({ subtree: true }).forEach((a) => a.cancel());
-      setPhase("idle");
-      setAdded(false);
-      Object.assign(s, { p: 0, pTarget: 0, theta: 0, omega: 0, x: 0, y: 0, vx: 0, vy: 0, rot: 0, vr: 3, snapped: false });
-      setView({ p: 0, theta: 0, freeX: 0, freeY: 0, freeRot: 0 });
-      busy.current = false;
-    }, ok ? 1500 : 500);
-  }
-
   function onPointerDown(e: React.PointerEvent<HTMLDivElement>) {
     if (phase === "torn" || busy.current) return;
     if (prefersReduced()) {
-      void handleTear();
+      snapNow();
       return;
     }
     e.stopPropagation();
@@ -237,24 +256,25 @@ export function TearStub({
     lastX.current = e.clientX;
     setDragging(true);
     e.currentTarget.setPointerCapture(e.pointerId);
-    startPhysics(
-      () => {
-        // 约束崩断瞬间：纸真的被撕断
-        if (debrisRef.current) burstDebris(debrisRef.current);
-        shake(rootRef.current);
-        void addToCart().then((ok) => {
-          if (ok) slamStamp();
-          setAdded(true);
-        });
-      },
-      () => {
-        // 纸片落出视野后整体复位
-        setAdded(false);
-        Object.assign(phys.current, { p: 0, pTarget: 0, theta: 0, omega: 0, x: 0, y: 0, vx: 0, vy: 0, rot: 0, vr: 3, snapped: false });
-        setView({ p: 0, theta: 0, freeX: 0, freeY: 0, freeRot: 0 });
-        setPhase("idle");
-      },
-    );
+    startPhysicsLoop(() => {
+      // 纸片飞出视野后整体复位
+      setAdded(false);
+      Object.assign(phys.current, {
+        p: 0,
+        pTarget: 0,
+        theta: 0,
+        omega: 0,
+        x: 0,
+        y: 0,
+        vx: 0,
+        vy: 0,
+        rot: 0,
+        vr: 0,
+        snapped: false,
+      });
+      setView({ p: 0, theta: 0, x: 0, y: 0, rot: 0 });
+      setPhase("idle");
+    });
   }
 
   function onPointerMove(e: React.PointerEvent<HTMLDivElement>) {
@@ -263,32 +283,30 @@ export function TearStub({
     const resist = raw > TEAR_THRESHOLD ? (raw - TEAR_THRESHOLD) * 0.3 : 0;
     const s = phys.current;
     s.pTarget = Math.min(1, (raw - resist) / TEAR_THRESHOLD);
-
     // 手速注入角速度（甩纸）
-    const dvx = e.clientX - (lastX.current ?? e.clientX);
+    s.omega += (e.clientX - (lastX.current ?? e.clientX)) * 0.0012;
     lastX.current = e.clientX;
-    s.omega += dvx * 0.0012;
-
-    // 撕口每前进一截，来一声轻「嘶」
   }
 
   function onPointerUp() {
     if (startX.current === null) return;
     startX.current = null;
     setDragging(false);
-    if (phys.current.p >= 0.98 && !phys.current.snapped) {
-      // 拉满未崩断：约束直接失效
-      phys.current.snapped = true;
-      phys.current.vx = 140;
-      phys.current.vy = -30;
-      phys.current.vr = 4;
+    // 拖到头（撕口拉满）松手 = 约束崩断
+    if (phys.current.p >= 0.9) {
+      snapNow();
+    } else {
+      // 未撕断：撕口弹回合拢
+      phys.current.pTarget = 0;
     }
   }
 
   function onKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
-      void handleTear();
+      phys.current.pTarget = 1;
+      phys.current.p = 1;
+      snapNow();
     }
   }
 
@@ -308,7 +326,7 @@ export function TearStub({
         className="mt-1 text-right text-[10px] font-medium"
         style={{ color: progress >= 0.7 ? "var(--color-promo)" : undefined, opacity: progress >= 0.7 ? 1 : 0.4 }}
       >
-        {s.snapped ? "撕开了！" : progress >= 0.7 ? "再撕！快断了！" : "按住向右撕 = 加购"}
+        {snapped ? "撕开了！" : progress >= 0.7 ? "再撕！快断了！" : "按住向右撕 = 加购"}
       </p>
     </>
   );
@@ -321,7 +339,7 @@ export function TearStub({
       <div
         aria-hidden
         className="absolute inset-0 flex items-center justify-center rounded-b-xl bg-promo/10 transition-opacity duration-150"
-        style={{ opacity: phase === "torn" || progress > 0.3 || s.snapped ? 1 : 0 }}
+        style={{ opacity: phase === "torn" || progress > 0.3 || snapped ? 1 : 0 }}
       >
         <div aria-hidden className="tear-edge absolute inset-x-0 -top-1.5 h-2" />
         <span
@@ -336,7 +354,7 @@ export function TearStub({
 
       <div ref={debrisRef} aria-hidden className="pointer-events-none absolute inset-0 z-20" />
 
-      {/* 可撕票根：左半边带物理悬垂（Verlet 摆），右半边连着卡片 */}
+      {/* 可撕票根：左半边带物理悬垂，右半边连着卡片 */}
       <div
         role="button"
         tabIndex={0}
@@ -362,15 +380,15 @@ export function TearStub({
         >
           {stubContent}
         </div>
-        {/* 已撕开的左半边：挂在撕口上，物理摆动；崩断后自由落体翻滚 */}
+        {/* 已撕开的左半边：挂在撕口上物理摆动；崩断后自由落体翻滚 */}
         <div
           ref={looseRef}
           className={stubBase}
           style={{
-            opacity: progress === 0 && !dragging && !s.snapped ? 0 : 1,
+            opacity: progress === 0 && !dragging && !snapped ? 0 : 1,
             clipPath: clips.current.leftClip(progress),
             transformOrigin: "100% 50%",
-            transform: s.snapped
+            transform: snapped
               ? `translate(${s.x.toFixed(1)}px, ${s.y.toFixed(1)}px) rotate(${s.rot.toFixed(1)}deg)`
               : `rotate(${s.theta.toFixed(3)}rad) translateY(${(progress * 4).toFixed(1)}px)`,
           }}
