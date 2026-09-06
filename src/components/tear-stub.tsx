@@ -7,16 +7,18 @@ import type { ApiResponse } from "@/types/api";
 import { isApiSuccess } from "@/types/api";
 
 const TEAR_THRESHOLD = 90;
+const CLIP_STEPS = 8;
 const DEBRIS_COLORS = ["#ffffff", "#e63946", "#fca311", "#14213d"];
 
-// 撕票根（狂野版）：按住向右拖，撕开的瞬间——票根乱飞、纸屑四溅、卡片抖动、
-// 印章「啪」地盖下来。每片碎纸轨迹随机（Web Animations API），尊重减弱动效偏好。
+// 撕票根（渐进撕开版）：按住向右拖，撕口沿锯齿一点一点向右推进——
+// 左半边先撕开悬垂晃动，右半边还连在卡片上；松手过线整块飞走。
+// 双副本 + clip-path 锯齿切割（Web Animations API 随机飞散），尊重减弱动效偏好。
 
 function prefersReduced(): boolean {
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
-/** 碎纸乱飞：在容器里撒一把随机轨迹的纸屑 */
+/** 纸屑乱飞 */
 function burstDebris(container: HTMLElement) {
   for (let i = 0; i < 12; i++) {
     const bit = document.createElement("span");
@@ -39,7 +41,7 @@ function burstDebris(container: HTMLElement) {
     bit
       .animate(
         [
-          { transform: `translate(0,0) rotate(0deg)`, opacity: 1 },
+          { transform: "translate(0,0) rotate(0deg)", opacity: 1 },
           { transform: `translate(${dx.toFixed(0)}px,${dy.toFixed(0)}px) rotate(${rot.toFixed(0)}deg)`, opacity: 0 },
         ],
         { duration: 420 + Math.random() * 480, easing: "cubic-bezier(.15,.6,.3,1)" },
@@ -49,7 +51,6 @@ function burstDebris(container: HTMLElement) {
   }
 }
 
-/** 卡片受击抖动 */
 function shake(el: HTMLElement | null) {
   el?.animate(
     [
@@ -62,6 +63,26 @@ function shake(el: HTMLElement | null) {
     ],
     { duration: 280, easing: "ease-out" },
   );
+}
+
+/** 生成撕口两侧的锯齿 clip-path（撕开瞬间随机毛边，拖拽期间保持稳定） */
+function makeTearClips(): { leftClip: (p: number) => string; rightClip: (p: number) => string } {
+  const leftJitter = Array.from({ length: CLIP_STEPS + 1 }, (_, i) =>
+    i === 0 || i === CLIP_STEPS ? 0 : (i % 2 === 0 ? -1 : 1) * (0.8 + Math.random() * 1.6),
+  );
+  const rightJitter = leftJitter.map((v, i) => (i === 0 || i === CLIP_STEPS ? 0 : -v));
+
+  const leftClip = (p: number) => {
+    const x = p * 100;
+    const teeth = leftJitter.map((j, i) => `${(x + j).toFixed(2)}% ${((i / CLIP_STEPS) * 100).toFixed(1)}%`);
+    return `polygon(0% 0%, ${teeth.join(", ")}, 0% 100%)`;
+  };
+  const rightClip = (p: number) => {
+    const x = p * 100;
+    const teeth = rightJitter.map((j, i) => `${(x + j).toFixed(2)}% ${((i / CLIP_STEPS) * 100).toFixed(1)}%`);
+    return `polygon(${teeth.join(", ")}, 100% 100%, 100% 0%)`;
+  };
+  return { leftClip, rightClip };
 }
 
 export function TearStub({
@@ -81,10 +102,14 @@ export function TearStub({
   const startX = useRef<number | null>(null);
   const deltaRef = useRef(0);
   const busy = useRef(false);
+  const clips = useRef(makeTearClips());
   const rootRef = useRef<HTMLDivElement>(null);
-  const stubRef = useRef<HTMLDivElement>(null);
+  const looseRef = useRef<HTMLDivElement>(null);
   const debrisRef = useRef<HTMLDivElement>(null);
   const stampRef = useRef<HTMLSpanElement>(null);
+
+  const progress = Math.min(1, delta / TEAR_THRESHOLD);
+  const atThreshold = delta >= TEAR_THRESHOLD;
 
   async function addToCart(): Promise<boolean> {
     try {
@@ -111,7 +136,6 @@ export function TearStub({
     }
   }
 
-  /** 印章「啪」地盖下 */
   function slamStamp() {
     stampRef.current?.animate(
       [
@@ -127,19 +151,20 @@ export function TearStub({
     busy.current = true;
     setPhase("torn");
 
-    // 视觉：票根乱飞 + 纸屑四溅 + 卡片抖动（减弱动效时只隐去票根）
-    if (stubRef.current && !prefersReduced()) {
-      stubRef.current.animate(
+    const loose = looseRef.current;
+    if (loose && !prefersReduced()) {
+      // 已撕开的部分整块飞走（从当前位置继续）
+      loose.animate(
         [
-          { transform: `translateX(${deltaRef.current}px) rotate(${deltaRef.current / 20}deg)`, opacity: 1 },
-          { transform: "translate(170px,52px) rotate(34deg)", opacity: 0 },
+          { transform: getComputedStyle(loose).transform === "none" ? "none" : getComputedStyle(loose).transform, opacity: 1 },
+          { transform: "translate(190px,64px) rotate(28deg)", opacity: 0 },
         ],
         { duration: 430, easing: "cubic-bezier(.25,.65,.3,1)", fill: "forwards" },
       );
       if (debrisRef.current) burstDebris(debrisRef.current);
       shake(rootRef.current);
-    } else if (stubRef.current) {
-      stubRef.current.style.opacity = "0";
+    } else if (loose) {
+      loose.style.opacity = "0";
     }
 
     const ok = await addToCart();
@@ -147,8 +172,8 @@ export function TearStub({
     setAdded(true);
 
     window.setTimeout(() => {
-      stubRef.current?.getAnimations({ subtree: true }).forEach((a) => a.cancel());
-      if (stubRef.current) stubRef.current.style.opacity = "1";
+      loose?.getAnimations({ subtree: true }).forEach((a) => a.cancel());
+      loose && (loose.style.opacity = "1");
       setPhase("idle");
       setDelta(0);
       deltaRef.current = 0;
@@ -171,10 +196,9 @@ export function TearStub({
 
   function onPointerMove(e: React.PointerEvent<HTMLDivElement>) {
     if (startX.current === null) return;
-    // 拖拽时的抖动/阻尼：越接近撕点越「挣扎」
     const raw = Math.max(0, Math.min(150, e.clientX - startX.current));
     const resist = raw > TEAR_THRESHOLD ? (raw - TEAR_THRESHOLD) * 0.35 : 0;
-    const next = Math.max(0, raw - resist + (Math.random() - 0.5) * 2.4);
+    const next = Math.max(0, raw - resist + (Math.random() - 0.5) * 2);
     deltaRef.current = next;
     setDelta(next);
   }
@@ -198,12 +222,28 @@ export function TearStub({
     }
   }
 
-  const progress = Math.min(1, delta / TEAR_THRESHOLD);
-  const atThreshold = delta >= TEAR_THRESHOLD;
-  const dragTransform =
-    phase === "torn"
-      ? "translateX(0px)"
-      : `translateX(${delta}px) rotate(${(delta / 16 + (dragging ? (Math.random() - 0.5) * 3 : 0)).toFixed(2)}deg)`;
+  const stubContent = (
+    <>
+      <span aria-hidden className="absolute -left-2 -top-2 h-4 w-4 rounded-full bg-white dark:bg-[#0b1220]" />
+      <span aria-hidden className="absolute -right-2 -top-2 h-4 w-4 rounded-full bg-white dark:bg-[#0b1220]" />
+      <span aria-hidden className="scissors absolute -top-2.5 left-6 text-xs opacity-60 transition-opacity group-hover:opacity-100">
+        ✂
+      </span>
+      <p className="flex items-baseline justify-between gap-2">
+        <span className="font-mono text-lg font-bold text-promo">{formatPrice(price)}</span>
+        <span className="text-xs opacity-50">已售 {formatSales(sales)}</span>
+      </p>
+      <p
+        className="mt-1 text-right text-[10px] font-medium"
+        style={{ color: atThreshold ? "var(--color-promo)" : undefined, opacity: atThreshold ? 1 : 0.4 }}
+      >
+        {atThreshold ? "松手！！" : "按住向右撕 = 加购"}
+      </p>
+    </>
+  );
+
+  const stubBase =
+    "coupon-dash absolute inset-0 rounded-b-xl bg-paper px-4 pb-4 pt-3 dark:bg-white/5";
 
   return (
     <div ref={rootRef} className="relative select-none">
@@ -227,9 +267,8 @@ export function TearStub({
       {/* 碎纸粒子层 */}
       <div ref={debrisRef} aria-hidden className="pointer-events-none absolute inset-0 z-20" />
 
-      {/* 可撕票根 */}
+      {/* 可撕票根：撕口渐进推进——左半边（已撕开）悬垂移动，右半边（未撕开）原位不动 */}
       <div
-        ref={stubRef}
         role="button"
         tabIndex={0}
         aria-label={`撕下加购，价格 ${formatPrice(price)}`}
@@ -238,27 +277,38 @@ export function TearStub({
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
         onKeyDown={onKeyDown}
-        className={`coupon-dash relative z-10 cursor-grab touch-pan-y rounded-b-xl bg-paper px-4 pb-4 pt-3 active:cursor-grabbing dark:bg-white/5 ${
-          dragging ? "" : "transition-transform duration-200"
+        className={`relative z-10 h-[88px] cursor-grab touch-pan-y active:cursor-grabbing dark:![background-color:transparent] ${
+          dragging ? "" : "transition-[clip-path,transform] duration-200"
         }`}
-        style={{ transform: dragTransform }}
       >
-        <span aria-hidden className="absolute -left-2 -top-2 h-4 w-4 rounded-full bg-white dark:bg-[#0b1220]" />
-        <span aria-hidden className="absolute -right-2 -top-2 h-4 w-4 rounded-full bg-white dark:bg-[#0b1220]" />
-        <span aria-hidden className="scissors absolute -top-2.5 left-6 text-xs opacity-60 transition-opacity group-hover:opacity-100">
-          ✂
-        </span>
-
-        <p className="flex items-baseline justify-between gap-2">
-          <span className="font-mono text-lg font-bold text-promo">{formatPrice(price)}</span>
-          <span className="text-xs opacity-50">已售 {formatSales(sales)}</span>
-        </p>
-        <p
-          className="mt-1 text-right text-[10px] font-medium"
-          style={{ color: atThreshold ? "var(--color-promo)" : undefined, opacity: atThreshold ? 1 : 0.4 }}
+        {/* 未撕开的右半边：原位不动 */}
+        <div
+          aria-hidden={progress === 0}
+          className={stubBase}
+          style={
+            progress === 0 && !dragging
+              ? undefined
+              : { clipPath: clips.current.rightClip(progress), transformOrigin: "100% 100%" }
+          }
         >
-          {atThreshold ? "松手！！" : "按住向右撕 = 加购"}
-        </p>
+          {stubContent}
+        </div>
+        {/* 已撕开的左半边：悬垂着跟手走 */}
+        <div
+          ref={looseRef}
+          className={stubBase}
+          style={
+            progress === 0 && !dragging
+              ? { opacity: 0 }
+              : {
+                  clipPath: clips.current.leftClip(progress),
+                  transform: `translateX(${delta * 0.6}px) translateY(${progress * 5}px) rotate(${progress * 7}deg)`,
+                  transformOrigin: "0% 100%",
+                }
+          }
+        >
+          {stubContent}
+        </div>
       </div>
     </div>
   );
