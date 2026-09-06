@@ -19,34 +19,6 @@ function prefersReduced(): boolean {
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
-// ---- 合成撕纸声（无音频资源：噪声 + 带通滤波 + 包络） ----
-let audioCtx: AudioContext | null = null;
-function ripSound(intensity: number) {
-  try {
-    audioCtx ??= new AudioContext();
-    const ctx = audioCtx;
-    if (ctx.state === "suspended") void ctx.resume();
-    const dur = 0.08 + 0.09 * intensity;
-    const buffer = ctx.createBuffer(1, Math.floor(ctx.sampleRate * dur), ctx.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < data.length; i++) {
-      data[i] = (Math.random() * 2 - 1) * (1 - i / data.length);
-    }
-    const src = ctx.createBufferSource();
-    src.buffer = buffer;
-    const filter = ctx.createBiquadFilter();
-    filter.type = "bandpass";
-    filter.frequency.value = 900 + 2800 * intensity;
-    filter.Q.value = 0.7;
-    const gain = ctx.createGain();
-    gain.gain.value = 0.1 * intensity;
-    src.connect(filter).connect(gain).connect(ctx.destination);
-    src.start();
-  } catch {
-    // 音频不可用（无设备/被策略阻止）则静默
-  }
-}
-
 function burstDebris(container: HTMLElement) {
   for (let i = 0; i < 12; i++) {
     const bit = document.createElement("span");
@@ -198,7 +170,6 @@ export function TearStub({
           s.vx = s.omega * 260;
           s.vy = -Math.abs(s.omega) * 60;
           s.vr = s.omega * 4;
-          ripSound(1);
           onSnap();
         }
       } else {
@@ -234,7 +205,6 @@ export function TearStub({
     s.vx = 120 + Math.abs(s.omega) * 200;
     s.vy = -40;
     s.vr = 3 + s.omega * 3;
-    ripSound(1);
 
     if (!prefersReduced()) {
       if (debrisRef.current) burstDebris(debrisRef.current);
@@ -270,7 +240,6 @@ export function TearStub({
     startPhysics(
       () => {
         // 约束崩断瞬间：纸真的被撕断
-        ripSound(1);
         if (debrisRef.current) burstDebris(debrisRef.current);
         shake(rootRef.current);
         void addToCart().then((ok) => {
@@ -301,7 +270,6 @@ export function TearStub({
     s.omega += dvx * 0.0012;
 
     // 撕口每前进一截，来一声轻「嘶」
-    if (s.p > 0.1 && Math.random() < 0.12) ripSound(0.35);
   }
 
   function onPointerUp() {
@@ -314,7 +282,6 @@ export function TearStub({
       phys.current.vx = 140;
       phys.current.vy = -30;
       phys.current.vr = 4;
-      ripSound(1);
     }
   }
 
