@@ -43,6 +43,7 @@ export async function GET(request: NextRequest) {
 }
 
 // PATCH /api/cart 全选 / 全不选 { checked }（作用于当前用户全部条目）
+// DELETE /api/cart?checked=1 删除全部勾选中的条目；?all=1 清空购物车
 const checkAllSchema = z.object({
   checked: z.boolean(),
 });
@@ -58,6 +59,26 @@ export async function PATCH(request: NextRequest) {
     });
 
     return ok({ updated: result.count }, body.checked ? "已全选" : "已取消全选");
+  });
+}
+
+export async function DELETE(request: NextRequest) {
+  return handleRoute(async () => {
+    const user = await requireUser();
+    const checkedOnly = request.nextUrl.searchParams.get("checked") === "1";
+    const all = request.nextUrl.searchParams.get("all") === "1";
+    if (!checkedOnly && !all) {
+      throw new ApiError("请指定删除范围（checked=1 或 all=1）", 40002, 400);
+    }
+
+    const result = await prisma.cartItem.deleteMany({
+      where: { userId: user.id, ...(checkedOnly ? { checked: true } : {}) },
+    });
+
+    return ok(
+      { deleted: result.count },
+      checkedOnly ? `已删除 ${result.count} 件勾选商品` : `已清空 ${result.count} 件商品`,
+    );
   });
 }
 

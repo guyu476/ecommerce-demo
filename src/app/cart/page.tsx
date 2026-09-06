@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import { useToast } from "@/components/toast";
 import { formatPrice } from "@/lib/format";
 import type { ApiResponse } from "@/types/api";
 import { isApiSuccess } from "@/types/api";
@@ -57,6 +58,7 @@ function CheckCircle({ checked, onToggle, disabled }: { checked: boolean; onTogg
 // 购物车页：勾选结算（单选圈 + 左下角全选）/ 数量增减 / 移除 / 合计只算勾选项
 export default function CartPage() {
   const router = useRouter();
+  const toast = useToast();
   const [status, setStatus] = useState<"loading" | "guest" | "ready">("loading");
   const [cart, setCart] = useState<CartData | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
@@ -128,6 +130,28 @@ export default function CartPage() {
     await loadCart();
     notifyCartChanged();
     setBusyId(null);
+  }
+
+  // 批量删除勾选中的商品（配合全选即可整批清掉）
+  const [deletingChecked, setDeletingChecked] = useState(false);
+  async function removeChecked() {
+    if (checkedItems.length === 0) return;
+    setDeletingChecked(true);
+    try {
+      const res = await fetch("/api/cart?checked=1", { method: "DELETE" });
+      const result = (await res.json()) as ApiResponse<{ deleted: number }>;
+      if (isApiSuccess(result)) {
+        toast(result.message);
+        await loadCart();
+        notifyCartChanged();
+      } else {
+        toast(result.message, "error");
+      }
+    } catch {
+      toast("网络异常，请稍后重试", "error");
+    } finally {
+      setDeletingChecked(false);
+    }
   }
 
   if (status === "loading") {
@@ -253,7 +277,7 @@ export default function CartPage() {
 
           {/* 结算栏：左下角全选，合计只算勾选项 */}
           <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-black/5 px-6 py-4 dark:bg-white/10">
-            <div className="flex items-center gap-6">
+            <div className="flex items-center gap-5">
               <label className="flex cursor-pointer items-center gap-2 text-sm">
                 <CheckCircle
                   checked={everythingChecked}
@@ -262,6 +286,15 @@ export default function CartPage() {
                 />
                 全选
               </label>
+              <button
+                type="button"
+                disabled={deletingChecked || checkedItems.length === 0}
+                onClick={removeChecked}
+                className="text-sm opacity-60 transition-colors hover:text-promo hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-25"
+                title={checkedItems.length === 0 ? "先勾选要删除的商品" : undefined}
+              >
+                {deletingChecked ? "删除中…" : `删除选中（${checkedItems.length}）`}
+              </button>
               <p className="text-sm opacity-70">
                 已选 {checkedQuantity} 件，合计：
                 <span className="ml-1 text-xl font-bold text-red-600 dark:text-red-400">
