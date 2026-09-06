@@ -139,6 +139,21 @@ html {
   border-top: 2px dashed rgba(20, 33, 61, 0.12);
 }
 
+/* 撕票根：剪刀悬停提示 */
+@keyframes scissors-wiggle {
+  0%,
+  100% {
+    transform: rotate(-10deg);
+  }
+  50% {
+    transform: rotate(10deg);
+  }
+}
+
+.group:hover .scissors {
+  animation: scissors-wiggle 0.7s ease-in-out infinite;
+}
+
 /* toast 浮出动画 */
 @keyframes toast-in {
   from {
