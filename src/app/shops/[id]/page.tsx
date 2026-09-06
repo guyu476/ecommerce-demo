@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { DbSetupNotice } from "@/components/db-setup-notice";
 import { ProductCard } from "@/components/product-card";
 import { ShopFavoriteButton } from "@/components/shop-favorite-button";
+import { getActiveDiscounts } from "@/lib/discounts";
 import { getShopById } from "@/lib/queries";
 
 type Props = PageProps<"/shops/[id]">;
@@ -39,6 +40,8 @@ export default async function ShopPage({ params }: Props) {
 
   // 店铺不存在
   if (shop === null) notFound();
+
+  const shopDiscounts = await getActiveDiscounts(shop.products.map((p) => p.id));
 
   return (
     <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-12">
@@ -91,7 +94,11 @@ export default async function ShopPage({ params }: Props) {
           <ul className="grid grid-cols-2 gap-x-8 gap-y-12 sm:grid-cols-3 lg:grid-cols-4">
             {shop.products.map((product, i) => (
               <li key={product.id} className="pt-1">
-                <ProductCard product={product} tilt={i % 2 === 0 ? 0.6 : -0.5} />
+                <ProductCard
+                  product={product}
+                  tilt={i % 2 === 0 ? 0.6 : -0.5}
+                  discountRate={shopDiscounts.get(product.id)?.rate ?? null}
+                />
               </li>
             ))}
           </ul>

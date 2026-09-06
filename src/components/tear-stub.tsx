@@ -41,7 +41,10 @@ function burstDebris(container: HTMLElement) {
       .animate(
         [
           { transform: "translate(0,0) rotate(0deg)", opacity: 1 },
-          { transform: `translate(${dx.toFixed(0)}px,${dy.toFixed(0)}px) rotate(${rot.toFixed(0)}deg)`, opacity: 0 },
+          {
+            transform: `translate(${dx.toFixed(0)}px,${dy.toFixed(0)}px) rotate(${rot.toFixed(0)}deg)`,
+            opacity: 0,
+          },
         ],
         { duration: 420 + Math.random() * 480, easing: "cubic-bezier(.15,.6,.3,1)" },
       )
@@ -71,12 +74,16 @@ function makeTearClips(): { leftClip: (p: number) => string; rightClip: (p: numb
   const rightJitter = leftJitter.map((v, i) => (i === 0 || i === CLIP_STEPS ? 0 : -v));
   const leftClip = (p: number) => {
     const x = p * 100;
-    const teeth = leftJitter.map((j, i) => `${(x + j).toFixed(2)}% ${((i / CLIP_STEPS) * 100).toFixed(1)}%`);
+    const teeth = leftJitter.map(
+      (j, i) => `${(x + j).toFixed(2)}% ${((i / CLIP_STEPS) * 100).toFixed(1)}%`,
+    );
     return `polygon(0% 0%, ${teeth.join(", ")}, 0% 100%)`;
   };
   const rightClip = (p: number) => {
     const x = p * 100;
-    const teeth = rightJitter.map((j, i) => `${(x + j).toFixed(2)}% ${((i / CLIP_STEPS) * 100).toFixed(1)}%`);
+    const teeth = rightJitter.map(
+      (j, i) => `${(x + j).toFixed(2)}% ${((i / CLIP_STEPS) * 100).toFixed(1)}%`,
+    );
     return `polygon(${teeth.join(", ")}, 100% 100%, 100% 0%)`;
   };
   return { leftClip, rightClip };
@@ -86,10 +93,13 @@ export function TearStub({
   productId,
   price,
   sales,
+  originalPrice = null,
 }: {
   productId: number;
   price: string;
   sales: number;
+  /** 参与限时折扣时的原价（划线展示） */
+  originalPrice?: string | null;
 }) {
   const toast = useToast();
   const [view, setView] = useState({ p: 0, theta: 0, x: 0, y: 0, rot: 0 });
@@ -232,7 +242,10 @@ export function TearStub({
       setView({ p: s.p, theta: s.theta, x: s.x, y: s.y, rot: s.rot });
 
       const settled =
-        !s.snapped && Math.abs(s.p - s.pTarget) < 0.002 && Math.abs(s.theta) < 0.002 && Math.abs(s.omega) < 0.002;
+        !s.snapped &&
+        Math.abs(s.p - s.pTarget) < 0.002 &&
+        Math.abs(s.theta) < 0.002 &&
+        Math.abs(s.omega) < 0.002;
       const flown = s.snapped && s.y > 320;
 
       if (settled || flown) {
@@ -313,25 +326,45 @@ export function TearStub({
   const s = phys.current;
   const stubContent = (
     <>
-      <span aria-hidden className="absolute -left-2 -top-2 h-4 w-4 rounded-full bg-white dark:bg-[#0b1220]" />
-      <span aria-hidden className="absolute -right-2 -top-2 h-4 w-4 rounded-full bg-white dark:bg-[#0b1220]" />
-      <span aria-hidden className="scissors absolute -top-2.5 left-6 text-xs opacity-60 transition-opacity group-hover:opacity-100">
+      <span
+        aria-hidden
+        className="absolute -left-2 -top-2 h-4 w-4 rounded-full bg-white dark:bg-[#0b1220]"
+      />
+      <span
+        aria-hidden
+        className="absolute -right-2 -top-2 h-4 w-4 rounded-full bg-white dark:bg-[#0b1220]"
+      />
+      <span
+        aria-hidden
+        className="scissors absolute -top-2.5 left-6 text-xs opacity-60 transition-opacity group-hover:opacity-100"
+      >
         ✂
       </span>
       <p className="flex items-baseline justify-between gap-2">
-        <span className="font-mono text-lg font-bold text-promo">{formatPrice(price)}</span>
+        <span className="font-mono text-lg font-bold text-promo">
+          {formatPrice(price)}
+          {originalPrice && (
+            <span className="ml-1.5 text-xs font-normal line-through opacity-40">
+              {formatPrice(originalPrice)}
+            </span>
+          )}
+        </span>
         <span className="text-xs opacity-50">已售 {formatSales(sales)}</span>
       </p>
       <p
         className="mt-1 text-right text-[10px] font-medium"
-        style={{ color: progress >= 0.7 ? "var(--color-promo)" : undefined, opacity: progress >= 0.7 ? 1 : 0.4 }}
+        style={{
+          color: progress >= 0.7 ? "var(--color-promo)" : undefined,
+          opacity: progress >= 0.7 ? 1 : 0.4,
+        }}
       >
         {snapped ? "撕开了！" : progress >= 0.7 ? "再撕！快断了！" : "按住向右撕 = 加购"}
       </p>
     </>
   );
 
-  const stubBase = "coupon-dash absolute inset-0 rounded-b-xl bg-paper px-4 pb-4 pt-3 dark:bg-white/5";
+  const stubBase =
+    "coupon-dash absolute inset-0 rounded-b-xl bg-paper px-4 pb-4 pt-3 dark:bg-white/5";
 
   return (
     <div ref={rootRef} className="relative select-none">

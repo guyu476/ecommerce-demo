@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useToast } from "@/components/toast";
+import { rateLabel } from "@/lib/discounts";
 import { parseSkuSpecs, skuSpecText } from "@/lib/sku";
 import type { ApiResponse } from "@/types/api";
 import { isApiSuccess } from "@/types/api";
@@ -14,6 +15,7 @@ export type SkuLite = {
   stock: number;
   image?: string | null;
 };
+export type DiscountInfo = { rate: number; endAt: string } | null;
 
 // 规格选择器 + 加购：多规格商品的购买区（无规格商品仍走 AddToCartButton）
 // 选中完整组合后广播 sku-image 事件，商品相册联动切到该 SKU 的配图
@@ -21,15 +23,25 @@ export function SkuPicker({
   productId,
   specDefs,
   skus,
+  discount,
 }: {
   productId: number;
   specDefs: SpecDef[];
   skus: SkuLite[];
+  discount?: DiscountInfo;
 }) {
   const toast = useToast();
   const [selected, setSelected] = useState<Record<string, string>>({});
   const [quantity, setQuantity] = useState(1);
   const [busy, setBusy] = useState(false);
+  const [nowTick, setNowTick] = useState(() => Date.now());
+
+  // 折扣倒计时（分钟级刷新即可）
+  useEffect(() => {
+    if (!discount) return;
+    const timer = setInterval(() => setNowTick(Date.now()), 30_000);
+    return () => clearInterval(timer);
+  }, [discount]);
 
   // 按已选规格匹配 SKU：所有维度都选中且完全一致
   const parsedSkus = useMemo(
@@ -42,7 +54,9 @@ export function SkuPicker({
     if (!complete) return null;
     return (
       parsedSkus.find((sku) =>
-        names.every((name) => sku.parsed.some((spec) => spec.name === name && spec.value === selected[name])),
+        names.every((name) =>
+          sku.parsed.some((spec) => spec.name === name && spec.value === selected[name]),
+        ),
       ) ?? null
     );
   }, [parsedSkus, selected, specDefs]);
@@ -56,7 +70,9 @@ export function SkuPicker({
 
   const minPrice = Math.min(...skus.map((sku) => Number(sku.price)));
   const totalStock = skus.reduce((sum, sku) => sum + sku.stock, 0);
-  const displayPrice = matchedSku ? Number(matchedSku.price) : minPrice;
+  const rate = discount?.rate ?? null;
+  const basePrice = matchedSku ? Number(matchedSku.price) : minPrice;
+  const displayPrice = rate ? Math.round(basePrice * rate * 100) / 100 : basePrice;
   const displayStock = matchedSku ? matchedSku.stock : totalStock;
 
   function select(name: string, value: string) {
@@ -104,17 +120,30 @@ export function SkuPicker({
 
   return (
     <div className="space-y-4">
-      {/* 价格与库存：选中规格前显示区间（最低价）/总库存 */}
+      {/* 价格与库存：选中规格前显示区间（最低价）/总库存；有折扣展示划线原价 + 倒计时 */}
       <div>
-        <p className="text-xs tracking-[0.3em] text-promo">到手价</p>
+        <p className="text-xs tracking-[0.3em] text-promo">
+          {rate ? `限时 ${rateLabel(rate)}` : "到手价"}
+        </p>
         <p className="font-mono text-4xl font-black text-promo">
           {displayPrice.toFixed(2)}
+          {rate && (
+            <span className="ml-2 text-base font-medium line-through opacity-40">
+              {basePrice.toFixed(2)}
+            </span>
+          )}
           {!matchedSku && skus.length > 1 && (
             <span className="ml-1 text-sm font-medium opacity-60">起</span>
           )}
         </p>
         <p className="mt-1 text-sm opacity-60">
           {matchedSku ? skuSpecText(matchedSku.parsed) : "请选择规格"} · 库存 {displayStock}
+          {discount && (
+            <span className="ml-2 text-promo">
+              ⏰ {Math.max(0, Math.ceil((new Date(discount.endAt).getTime() - nowTick) / 3600000))}
+              小时后恢复原价
+            </span>
+          )}
         </p>
       </div>
 

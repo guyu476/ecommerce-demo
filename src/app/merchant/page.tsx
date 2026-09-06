@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { DiscountManager } from "@/components/discount-manager";
 import { MerchantCoupons } from "@/components/merchant-coupons";
 import { OrderManager } from "@/components/order-manager";
 import { ProductManager } from "@/components/product-manager";
@@ -16,7 +17,7 @@ type MerchantTab = "shop" | "coupons" | "products" | "orders";
 const TABS: { key: MerchantTab; label: string }[] = [
   { key: "products", label: "🛍️ 商品管理" },
   { key: "orders", label: "📦 订单发货" },
-  { key: "coupons", label: "🎟️ 店铺优惠券" },
+  { key: "coupons", label: "🎟️ 店铺营销" },
   { key: "shop", label: "🏪 店铺设置" },
 ];
 
@@ -145,7 +146,12 @@ export default function MerchantPage() {
             查看（只读监督）
           </p>
         ))}
-      {tab === "coupons" && <MerchantCoupons />}
+      {tab === "coupons" && (
+          <div className="space-y-8">
+            <MerchantCoupons />
+            <DiscountManager scope="merchant" />
+          </div>
+        )}
       {tab === "shop" && <ShopSettings />}
     </main>
   );

@@ -7,6 +7,7 @@ import { FavoriteButton } from "@/components/favorite-button";
 import { ProductGallery } from "@/components/product-gallery";
 import { SkuPicker } from "@/components/sku-picker";
 import { formatPrice, formatSales } from "@/lib/format";
+import { discountedPrice, getActiveDiscounts, rateLabel } from "@/lib/discounts";
 import { getProductById, parseProductImages } from "@/lib/queries";
 import { parseSpecs } from "@/lib/sku";
 
@@ -70,6 +71,8 @@ export default async function ProductDetailPage({ params }: Props) {
     product.reviews.length > 0
       ? product.reviews.reduce((sum, review) => sum + review.rating, 0) / product.reviews.length
       : 0;
+  // 进行中的限时折扣
+  const discount = (await getActiveDiscounts([product.id])).get(product.id) ?? null;
 
   return (
     <main className="mx-auto w-full max-w-4xl flex-1 px-6 py-12">
@@ -102,23 +105,41 @@ export default async function ProductDetailPage({ params }: Props) {
 
           {/* 购买区：多规格走规格选择器（含价格/库存/数量），单品走原价格+加购 */}
           {product.skus.length > 0 ? (
-              <SkuPicker
-                productId={product.id}
-                specDefs={parseSpecs(product.specs)}
-                skus={product.skus.map((sku) => ({
-                  id: sku.id,
-                  specs: sku.specs,
-                  price: String(sku.price),
-                  stock: sku.stock,
-                  image: sku.image,
-                }))}
-              />
+            <SkuPicker
+              productId={product.id}
+              specDefs={parseSpecs(product.specs)}
+              skus={product.skus.map((sku) => ({
+                id: sku.id,
+                specs: sku.specs,
+                price: String(sku.price),
+                stock: sku.stock,
+                image: sku.image,
+              }))}
+              discount={
+                discount
+                  ? { rate: Number(discount.rate), endAt: discount.endAt.toISOString() }
+                  : null
+              }
+            />
           ) : (
             <div>
-              <p className="text-xs tracking-[0.3em] text-promo">到手价</p>
-              <p className="font-mono text-4xl font-black text-promo">
-                {formatPrice(product.price)}
+              <p className="text-xs tracking-[0.3em] text-promo">
+                {discount ? `限时 ${rateLabel(Number(discount.rate))}` : "到手价"}
               </p>
+              <p className="font-mono text-4xl font-black text-promo">
+                {discount
+                  ? formatPrice(discountedPrice(Number(product.price), Number(discount.rate)))
+                  : formatPrice(product.price)}
+              </p>
+              {discount && (
+                <p className="mt-1 text-sm">
+                  <span className="mr-2 line-through opacity-45">{formatPrice(product.price)}</span>
+                  <span className="opacity-60">
+                    ⏰ {new Date(discount.endAt).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                    {" "}前有效
+                  </span>
+                </p>
+              )}
             </div>
           )}
 

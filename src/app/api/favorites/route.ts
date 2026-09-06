@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 import { z } from "zod";
 import { ApiError, handleRoute, isPrismaError, ok } from "@/lib/api-response";
 import { requireUser } from "@/lib/auth";
+import { getActiveDiscounts } from "@/lib/discounts";
 import { prisma } from "@/lib/prisma";
 
 // ============ 收藏夹 ============
@@ -20,7 +21,10 @@ export async function GET() {
       include: { product: { include: { category: true } } },
       orderBy: { createdAt: "desc" },
     });
-    return ok(favorites);
+    const discounts = await getActiveDiscounts(favorites.map((f) => f.productId));
+    return ok(
+      favorites.map((f) => ({ ...f, discountRate: discounts.get(f.productId)?.rate ?? null })),
+    );
   });
 }
 

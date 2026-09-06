@@ -2,6 +2,7 @@ import Link from "next/link";
 import { DbSetupNotice } from "@/components/db-setup-notice";
 import { HeroCarousel } from "@/components/hero-carousel";
 import { ProductCard } from "@/components/product-card";
+import { getActiveDiscounts } from "@/lib/discounts";
 import { getHomepageCoupons, getStorefrontData, parseProductImages } from "@/lib/queries";
 import type { StorefrontSort } from "@/lib/queries";
 
@@ -90,6 +91,8 @@ export default async function Home({ searchParams }: PageProps<"/">) {
     getStorefrontData(categorySlug, keyword, sort, page),
     getHomepageCoupons(),
   ]);
+  // 参与限时折扣的商品（卡片划线原价 + 折扣角标）
+  const discounts = data ? await getActiveDiscounts(data.products.map((p) => p.id)) : null;
 
   if (!data) {
     return (
@@ -274,6 +277,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
                     product={product}
                     rank={page === 1 && sort === "default" ? i + 1 : undefined}
                     tilt={i % 2 === 0 ? 0.6 : -0.5}
+                    discountRate={discounts?.get(product.id)?.rate ?? null}
                   />
                 </li>
               ))}

@@ -400,6 +400,26 @@ async function main() {
     }
   }
 
+  // 演示限时折扣：平台活动圈 3 个商品 8.5 折（幂等按 title）
+  const discountStart = new Date(Date.now() - 3600_000);
+  const discountEnd = new Date(Date.now() + 3 * 86400_000);
+  const discountExists = await prisma.discountActivity.findFirst({
+    where: { title: '开学季限时 8.5 折' },
+  });
+  if (!discountExists && productIdByIndex.get(0) && productIdByIndex.get(1) && productIdByIndex.get(4)) {
+    await prisma.discountActivity.create({
+      data: {
+        title: '开学季限时 8.5 折',
+        rate: 0.85,
+        startAt: discountStart,
+        endAt: discountEnd,
+        items: {
+          create: [0, 1, 4].map((index) => ({ productId: productIdByIndex.get(index)! })),
+        },
+      },
+    });
+  }
+
   // 演示收藏：demo 用户收藏两家店铺（幂等，「我的收藏·店铺」Tab 有数据可看）
   for (const shop of [demoShop, demoShop2]) {
     const existingFavorite = await prisma.favoriteShop.findFirst({
@@ -448,7 +468,7 @@ async function main() {
   }
 
   console.log(
-    `种子数据完成：分类 ${categories.length} 个，新写入商品 ${created} 个（共 ${products.length} 条），演示订单 2 笔 + 评价 2 条，商家 2 位（鸟西数码旗舰店 / 优选生活百货），优惠券 ${couponSpecs.length} 张（平台 3 + 店铺 1）`,
+    `种子数据完成：分类 ${categories.length} 个，新写入商品 ${created} 个（共 ${products.length} 条），演示订单 2 笔 + 评价 2 条，商家 2 位（鸟西数码旗舰店 / 优选生活百货），优惠券 ${couponSpecs.length} 张（平台 3 + 店铺 1），限时折扣 1 场`,
   );
 }
 

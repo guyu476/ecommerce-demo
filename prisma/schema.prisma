@@ -39,6 +39,7 @@ model User {
   favoriteShops FavoriteShop[]
   userCoupons  UserCoupon[]
   issuedCoupons Coupon[]
+  discounts     DiscountActivity[]
 
   @@map("users")
 }
@@ -132,11 +133,44 @@ model Product {
   reviews     Review[]
   favorites   Favorite[]
   skus        Sku[]
+  discountItems DiscountItem[]
 
   @@index([categoryId])
   @@index([status])
   @@index([shopId])
   @@map("products")
+}
+
+// ==================== 限时折扣 ====================
+
+// 折扣活动：rate 为折扣率（0.85 = 8.5 折），生效期内圈内商品按 rate 计价；
+// ownerId 为空 = 平台活动（管理员发），非空 = 店铺活动（商家发，圈自己的商品）
+model DiscountActivity {
+  id        Int            @id @default(autoincrement())
+  title     String         @db.VarChar(100)
+  rate      Decimal        @db.Decimal(3, 2)
+  startAt   DateTime       @map("start_at")
+  endAt     DateTime       @map("end_at")
+  ownerId   Int?           @map("owner_id")
+  owner     User?          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  createdAt DateTime       @default(now()) @map("created_at")
+  items     DiscountItem[]
+
+  @@index([ownerId])
+  @@map("discount_activities")
+}
+
+// 活动商品：一活动圈多个商品，同商品同时段只取折扣最低的一个活动
+model DiscountItem {
+  id         Int              @id @default(autoincrement())
+  activityId Int              @map("activity_id")
+  activity   DiscountActivity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  productId  Int              @map("product_id")
+  product    Product          @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([activityId, productId])
+  @@index([productId])
+  @@map("discount_items")
 }
 
 // SKU：规格组合的最小销售单元，价格/库存/销量都按 SKU 维护

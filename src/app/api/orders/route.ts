@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 import { z } from "zod";
 import { ApiError, handleRoute, isPrismaError, ok } from "@/lib/api-response";
 import { requireUser } from "@/lib/auth";
+import { discountedPrice, getActiveDiscounts } from "@/lib/discounts";
 import { generateOrderNo, groupByShop, hashRequest } from "@/lib/order";
 import { parseSkuSpecs, skuSpecText } from "@/lib/sku";
 import { prisma } from "@/lib/prisma";
@@ -49,22 +50,37 @@ export async function POST(request: NextRequest) {
 
         // 2.5 加载 SKU 现价（快照用现价而非加购价；规格已删除则报错让用户重新加购）
         const skuIds = cartItems.filter((item) => item.skuId > 0).map((item) => item.skuId);
-        const skus = skuIds.length
-          ? await tx.sku.findMany({ where: { id: { in: skuIds } } })
-          : [];
+        const skus = skuIds.length ? await tx.sku.findMany({ where: { id: { in: skuIds } } }) : [];
         const skuById = new Map(skus.map((sku) => [sku.id, sku]));
-        const effectivePriceOf = (item: (typeof cartItems)[number]): {
+        const discounts = await getActiveDiscounts(cartItems.map((item) => item.productId));
+        const effectivePriceOf = (
+          item: (typeof cartItems)[number],
+        ): {
           price: string;
           specsText: string | null;
         } => {
           if (item.skuId > 0) {
             const sku = skuById.get(item.skuId);
             if (!sku || sku.productId !== item.productId) {
-              throw new ApiError(`商品「${item.product.name}」的规格已失效，请重新加购`, 40902, 409);
+              throw new ApiError(
+                `商品「${item.product.name}」的规格已失效，请重新加购`,
+                40902,
+                409,
+              );
             }
-            return { price: String(sku.price), specsText: skuSpecText(parseSkuSpecs(sku.specs)) };
+            const base = Number(sku.price);
+            const discount = discounts.get(item.productId);
+            return {
+              price: String(discount ? discountedPrice(base, discount.rate) : base),
+              specsText: skuSpecText(parseSkuSpecs(sku.specs)),
+            };
           }
-          return { price: String(item.product.price), specsText: item.skuSpecs };
+          const base = Number(item.product.price);
+          const discount = discounts.get(item.productId);
+          return {
+            price: String(discount ? discountedPrice(base, discount.rate) : base),
+            specsText: item.skuSpecs,
+          };
         };
 
         // 3. 逐项条件更新扣库存（防超卖）：有 SKU 扣 SKU 库存并同步商品聚合库存，任一失败整体回滚
@@ -235,8 +251,7 @@ export async function POST(request: NextRequest) {
         return createdOrders;
       });
 
-      const splitHint =
-        orders.length > 1 ? `，已按店铺拆成 ${orders.length} 笔订单分别发货` : "";
+      const splitHint = orders.length > 1 ? `，已按店铺拆成 ${orders.length} 笔订单分别发货` : "";
       return ok({ orders }, `下单成功${splitHint}`);
     } catch (error) {
       // 幂等键冲突：并发或重试时由唯一约束裁决，走重放或响亮报错

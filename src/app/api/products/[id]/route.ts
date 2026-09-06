@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 import { z } from "zod";
 import { ApiError, handleRoute, ok } from "@/lib/api-response";
+import { getActiveDiscounts } from "@/lib/discounts";
 import { prisma } from "@/lib/prisma";
 
 // 路由参数（Next 16）：params 是 Promise，用 RouteContext 类型助手
@@ -37,7 +38,13 @@ export async function GET(_request: NextRequest, context: Context) {
       throw new ApiError("商品不存在", 40401, 404);
     }
 
-    return ok(product);
+    // 进行中的限时折扣（前端展示划线价/倒计时）
+    const discount = (await getActiveDiscounts([product.id])).get(product.id) ?? null;
+
+    return ok({
+      ...product,
+      discount: discount ? { rate: discount.rate, title: discount.title, endAt: discount.endAt } : null,
+    });
   });
 }
 

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { AdminCoupons } from "@/components/admin-coupons";
+import { DiscountManager } from "@/components/discount-manager";
 import { AdminDashboard } from "@/components/admin-dashboard";
 import { OrderManager } from "@/components/order-manager";
 import { ProductManager } from "@/components/product-manager";
@@ -152,7 +153,7 @@ export default function AdminPage() {
             { key: "dashboard", label: "数据看板" },
             { key: "products", label: "商品管理" },
             { key: "orders", label: "订单管理" },
-            { key: "coupons", label: "优惠券" },
+            { key: "coupons", label: "营销中心" },
             { key: "users", label: "用户管理" },
           ] as { key: AdminTab; label: string }[]
         ).map((entry) => (
@@ -188,7 +189,12 @@ export default function AdminPage() {
 
       {tab === "orders" && <OrderManager role="ADMIN" />}
 
-      {tab === "coupons" && <AdminCoupons />}
+      {tab === "coupons" && (
+        <div className="space-y-8">
+          <AdminCoupons />
+          <DiscountManager scope="admin" />
+        </div>
+      )}
 
       {tab === "users" && (
         <section className="overflow-hidden rounded-2xl border border-black/10 dark:border-white/15">

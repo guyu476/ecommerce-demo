@@ -44,12 +44,12 @@ npm run dev              # 启动开发服务器，打开 http://localhost:3000
 
 ## 演示账号
 
-| 角色         | 账号                  | 密码           | 店铺                                      |
-| ------------ | --------------------- | -------------- | ----------------------------------------- |
-| 用户         | demo@example.com      | 123456     | —                                         |
+| 角色         | 账号                  | 密码   | 店铺                                      |
+| ------------ | --------------------- | ------ | ----------------------------------------- |
+| 用户         | demo@example.com      | 123456 | —                                         |
 | 商家（一店） | merchant@example.com  | 123456 | 鸟西数码旗舰店（手机数码 / 电脑办公）     |
 | 商家（二店） | merchant2@example.com | 123456 | 优选生活百货（家电 / 服饰 / 美妆 / 生鲜） |
-| 管理员       | admin@example.com     | 123456    | —                                         |
+| 管理员       | admin@example.com     | 123456 | —                                         |
 
 短信登录 / 找回密码：任意合法手机号 + 任意 6 位验证码（演示环境不校验；短信登录时未注册手机号会自动建号）。
 
@@ -58,6 +58,7 @@ npm run dev              # 启动开发服务器，打开 http://localhost:3000
 **买家侧**
 
 - 商城首页：搜索（名称/描述）、排序（综合/最新/价格升降）、分类票签筛选、热卖轮播、分页、领券条幅
+- **限时折扣**：管理员/商家创建折扣活动圈选商品，生效期内全站按折后价计价（卡片划线原价+折扣角标、详情页倒计时、购物车/下单快照同价）
 - 商品详情：多图画廊 + 灯箱、**规格选择器（SKU 价格/库存联动）**、评分与评价列表、加入购物车、收藏心形、进店逛逛
 - 购物车 → 结算：**勾选结算**（单品圈选 + 全选，只结算勾中项）、**跨店自动拆单**（一店一笔订单，各自发货/退款互不影响）、**优惠券抵扣**（平台券按最大子单满减、店铺券按本店子单满减，服务端二次校验）、幂等键防重复下单（重放返回整组子单）
 - 订单：模拟支付、查看物流单号、确认收货、**申请退款（售后）**、评价（星级 + 文字）、五入口红点计数
@@ -68,13 +69,14 @@ npm run dev              # 启动开发服务器，打开 http://localhost:3000
 - 店铺设置（一人一店）：店名 / 店招 emoji / 简介，公开店铺主页 `/shops/[id]`
 - **发店铺券**：自定门槛/面额/数量/有效期，限本店商品满减；领取进度条、未领取可撤下
 - 商品管理：上架 / 下架 / 草稿、多图上传（`/api/upload`，客户端压缩后存站点文件）
+- 发店铺折扣：圈选自己店铺的商品，生效期内按折扣率计价
 - 订单发货：填写物流单号（留空自动生成演示单号）
 - 退款处理：同意退款（模拟打款、回补库存、订单取消）或拒绝
 
 **管理侧**（后台 `/admin`）
 
 - 数据看板：GMV（实付口径）、近 7 天订单趋势、状态分布、热卖 TOP 5、待发货 / 退款待处理告警
-- **发平台券**：全店通用；可查看全平台券（平台券/店铺券标识与领取进度）、撤下未领取的券
+- **发平台券 + 平台折扣**：券全店通用；折扣圈选商品按时段生效，营销中心统一管理
 - 商品 / 订单管理（只读监督）、用户角色管理
 
 **工程质量**
@@ -87,25 +89,25 @@ npm run dev              # 启动开发服务器，打开 http://localhost:3000
 
 ## 已实现页面
 
-| 路由                 | 说明                                                |
-| -------------------- | --------------------------------------------------- |
-| `/`                  | 首页：搜索/排序/分类筛选/热卖轮播/领券条幅/分页     |
-| `/products/[id]`     | 商品详情：画廊、规格选择、评分评价、加购、收藏、进店  |
-| `/shops/[id]`        | 店铺主页：店招横幅 + 店内在售商品                   |
-| `/cart`              | 购物车                                              |
-| `/checkout`          | 确认订单：地址簿、优惠券抵扣、幂等提交              |
-| `/orders`            | 我的订单：支付/物流/收货/退款/评价                  |
-| `/favorites`         | 我的收藏：商品 / 店铺双 Tab                         |
+| 路由                 | 说明                                                          |
+| -------------------- | ------------------------------------------------------------- |
+| `/`                  | 首页：搜索/排序/分类筛选/热卖轮播/领券条幅/分页               |
+| `/products/[id]`     | 商品详情：画廊、规格选择、评分评价、加购、收藏、进店          |
+| `/shops/[id]`        | 店铺主页：店招横幅 + 店内在售商品                             |
+| `/cart`              | 购物车                                                        |
+| `/checkout`          | 确认订单：地址簿、优惠券抵扣、幂等提交                        |
+| `/orders`            | 我的订单：支付/物流/收货/退款/评价                            |
+| `/favorites`         | 我的收藏：商品 / 店铺双 Tab                                   |
 | `/user`              | 个人中心：资料、地址簿、**优惠券（领券 + 我的券）**、订单入口 |
-| `/login` `/register` | 密码登录 / 短信登录（模拟）/ 找回密码（模拟）/ 注册 |
-| `/merchant`          | 商家中心：店铺设置、商品管理、发货、退款处理        |
-| `/admin`             | 管理后台：数据看板、商品/订单/用户管理              |
+| `/login` `/register` | 密码登录 / 短信登录（模拟）/ 找回密码（模拟）/ 注册           |
+| `/merchant`          | 商家中心：店铺设置、商品管理、发货、退款处理                  |
+| `/admin`             | 管理后台：数据看板、商品/订单/用户管理                        |
 
 数据库未就绪时页面会显示引导提示，而不是白屏报错。
 
 ## 数据模型（prisma/schema.prisma）
 
-`User`（三角色）、`Address`、`CartItem`（挂 `skuId`，勾选结算）、`Category`、`Product`（挂 `sellerId` 与 `shopId`，带 `seedKey` 种子幂等键、`specs` 规格定义）、`Sku`（规格组合，独立价格/库存/销量）、`Shop`（一人一店）、`Favorite`、`Coupon`（发券方 `ownerId`：空 = 平台券，非空 = 店铺券）/ `UserCoupon`（每人限领一张、一单至多用一张）、`FavoriteShop`（店铺收藏）、`Order`（含退款状态/原因/金额、物流单号、支付/发货/收货时间、**支付截止 `expireAt`**、券抵扣金额）、`OrderItem`（下单快照，含 SKU 规格文本）、`Review`（一单一商品一条）、`IdempotencyKey`。
+`User`（三角色）、`Address`、`CartItem`（挂 `skuId`，勾选结算）、`Category`、`Product`（挂 `sellerId` 与 `shopId`，带 `seedKey` 种子幂等键、`specs` 规格定义）、`Sku`（规格组合，独立价格/库存/销量）、`Shop`（一人一店）、`Favorite`、`Coupon`（发券方 `ownerId`：空 = 平台券，非空 = 店铺券）/ `UserCoupon`（每人限领一张、一单至多用一张）、`DiscountActivity`/`DiscountItem`（限时折扣，同商品多活动取最低折扣率）、`FavoriteShop`（店铺收藏）、`Order`（含退款状态/原因/金额、物流单号、支付/发货/收货时间、**支付截止 `expireAt`**、券抵扣金额）、`OrderItem`（下单快照，含 SKU 规格文本）、`Review`（一单一商品一条）、`IdempotencyKey`。
 
 **库存与销量语义**：下单只锁定库存（扣减，未计销量）；支付成功才计销量（商品聚合与 SKU 同步）；取消/超时/退款按 SKU 与聚合分别回补。待付款订单超时（`PAY_TIMEOUT_MINUTES`，默认 15 分钟）由定时任务（`src/instrumentation.ts` 注册）自动取消并释放库存。
 
@@ -139,32 +141,32 @@ scripts/                    # 绑图 / 重置演示订单 / 清理测试账号
 
 ## 接口速览
 
-| 方法与路径                                                                    | 说明                                                     |
-| ----------------------------------------------------------------------------- | -------------------------------------------------------- |
-| GET `/api/health`                                                             | 健康检查                                                 |
-| POST `/api/auth/register` \| `login` \| `logout` \| `sms-login`               | 注册 / 登录 / 登出 / 短信登录（模拟）                    |
-| POST `/api/auth/reset-password`                                               | 找回密码（模拟短信）                                     |
-| GET `/api/auth/me`                                                            | 当前用户                                                 |
-| GET `/api/categories`                                                         | 分类列表（含在售计数）                                   |
-| GET `/api/products`                                                           | 商品分页：keyword（名称/描述）、sort、categoryId、status |
-| GET/POST/PATCH `/api/cart`（PATCH=全选/取消全选），PATCH/DELETE `/api/cart/[id]`（数量/勾选） | 购物车（`?checkedOnly=1` 只看勾选项） |
-| GET/POST `/api/favorites`，DELETE `?productId=`，GET `/api/favorites/ids`     | 商品收藏列表 / 收藏 / 取消 / 心形状态                    |
-| GET/POST `/api/favorite-shops`，DELETE `?shopId=`，GET `/api/favorite-shops/ids` | 店铺收藏列表 / 收藏 / 取消 / 心形状态                 |
-| GET `/api/coupons`，POST（领取），GET `/api/coupons/mine`                     | 券模板（含平台券/店铺券标识）/ 领取 / 我的券             |
-| GET/POST `/api/merchant/coupons`，DELETE `/api/merchant/coupons/[id]`         | 店铺券管理（商家发券，限本店商品满减；未领取可撤）       |
-| GET/POST `/api/admin/coupons`，DELETE `/api/admin/coupons/[id]`               | 平台券管理（管理员发券，全店通用；未领取可撤）           |
-| POST `/api/orders`（Idempotency-Key + 可选 userCouponId）、GET                | 下单（跨店自动拆单，券抵扣）/ 订单分页                   |
-| GET `/api/orders/[id]`、GET `/api/orders/counts`                              | 订单详情 / 各状态计数                                    |
-| POST `/api/orders/[id]/transition`                                            | pay / ship（可带单号）/ confirm                          |
-| POST `/api/orders/[id]/cancel`                                                | 取消（仅待付款，回补库存）                               |
-| POST `/api/orders/[id]/refund`                                                | request（买家）/ approve、reject（商家）                 |
-| POST `/api/orders/[id]/reviews`                                               | 评价                                                     |
-| GET `/api/merchant/orders`                                                    | 含我商品的订单（发货/退款视角）                          |
-| GET/PUT `/api/merchant/shop`                                                  | 我的店铺 / 开店或更新                                    |
-| GET/POST `/api/merchant/products`，PATCH/DELETE `/api/merchant/products/[id]` | 商家商品管理                                             |
-| PATCH `/api/admin/users`，GET `/api/admin/stats`                              | 用户角色 / 数据看板                                      |
-| POST `/api/upload`                                                            | 图片上传（multipart 字段 `file`，存 `public/uploads`）   |
-| GET/POST `/api/addresses`，PATCH/DELETE `/api/addresses/[id]`                 | 地址簿                                                   |
+| 方法与路径                                                                                    | 说明                                                     |
+| --------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| GET `/api/health`                                                                             | 健康检查                                                 |
+| POST `/api/auth/register` \| `login` \| `logout` \| `sms-login`                               | 注册 / 登录 / 登出 / 短信登录（模拟）                    |
+| POST `/api/auth/reset-password`                                                               | 找回密码（模拟短信）                                     |
+| GET `/api/auth/me`                                                                            | 当前用户                                                 |
+| GET `/api/categories`                                                                         | 分类列表（含在售计数）                                   |
+| GET `/api/products`                                                                           | 商品分页：keyword（名称/描述）、sort、categoryId、status |
+| GET/POST/PATCH `/api/cart`（PATCH=全选/取消全选），PATCH/DELETE `/api/cart/[id]`（数量/勾选） | 购物车（`?checkedOnly=1` 只看勾选项）                    |
+| GET/POST `/api/favorites`，DELETE `?productId=`，GET `/api/favorites/ids`                     | 商品收藏列表 / 收藏 / 取消 / 心形状态                    |
+| GET/POST `/api/favorite-shops`，DELETE `?shopId=`，GET `/api/favorite-shops/ids`              | 店铺收藏列表 / 收藏 / 取消 / 心形状态                    |
+| GET `/api/coupons`，POST（领取），GET `/api/coupons/mine`                                     | 券模板（含平台券/店铺券标识）/ 领取 / 我的券             |
+| GET/POST `/api/merchant/coupons`，DELETE `/api/merchant/coupons/[id]`                         | 店铺券管理（商家发券，限本店商品满减；未领取可撤）       |
+| GET/POST `/api/admin/coupons`，DELETE `/api/admin/coupons/[id]`                               | 平台券管理（管理员发券，全店通用；未领取可撤）           |
+| POST `/api/orders`（Idempotency-Key + 可选 userCouponId）、GET                                | 下单（跨店自动拆单，券抵扣）/ 订单分页                   |
+| GET `/api/orders/[id]`、GET `/api/orders/counts`                                              | 订单详情 / 各状态计数                                    |
+| POST `/api/orders/[id]/transition`                                                            | pay / ship（可带单号）/ confirm                          |
+| POST `/api/orders/[id]/cancel`                                                                | 取消（仅待付款，回补库存）                               |
+| POST `/api/orders/[id]/refund`                                                                | request（买家）/ approve、reject（商家）                 |
+| POST `/api/orders/[id]/reviews`                                                               | 评价                                                     |
+| GET `/api/merchant/orders`                                                                    | 含我商品的订单（发货/退款视角）                          |
+| GET/PUT `/api/merchant/shop`                                                                  | 我的店铺 / 开店或更新                                    |
+| GET/POST `/api/merchant/products`，PATCH/DELETE `/api/merchant/products/[id]`                 | 商家商品管理                                             |
+| PATCH `/api/admin/users`，GET `/api/admin/stats`                                              | 用户角色 / 数据看板                                      |
+| POST `/api/upload`                                                                            | 图片上传（multipart 字段 `file`，存 `public/uploads`）   |
+| GET/POST `/api/addresses`，PATCH/DELETE `/api/addresses/[id]`                                 | 地址簿                                                   |
 
 ## 接口规范
 

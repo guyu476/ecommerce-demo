@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 import { z } from "zod";
 import { ApiError, handleRoute, ok } from "@/lib/api-response";
 import { requireUser } from "@/lib/auth";
+import { discountedPrice, getActiveDiscounts } from "@/lib/discounts";
 import { parseSkuSpecs, skuSpecText } from "@/lib/sku";
 import { prisma } from "@/lib/prisma";
 
@@ -20,16 +21,27 @@ export async function GET(request: NextRequest) {
       include: { product: { include: { category: true } } },
     });
 
-    // SKU 现价：有规格的条目按当前 SKU 价格（金额合计/展示均用现价）
+    // SKU 现价 + 限时折扣：有规格按 SKU 价、无规格按商品价，再乘以进行中折扣率
     const skuIds = items.filter((item) => item.skuId > 0).map((item) => item.skuId);
     const skus = skuIds.length ? await prisma.sku.findMany({ where: { id: { in: skuIds } } }) : [];
     const skuById = new Map(skus.map((sku) => [sku.id, sku]));
-    const itemsWithPrice = items.map((item) => ({
-      ...item,
-      unitPrice: String(
-        item.skuId > 0 ? (skuById.get(item.skuId)?.price ?? item.product.price) : item.product.price,
-      ),
-    }));
+    const discounts = await getActiveDiscounts(items.map((item) => item.productId));
+    const itemsWithPrice = items.map((item) => {
+      const base = Number(
+        item.skuId > 0
+          ? (skuById.get(item.skuId)?.price ?? item.product.price)
+          : item.product.price,
+      );
+      const discount = discounts.get(item.productId);
+      const unitPrice = discount ? discountedPrice(base, discount.rate) : base;
+      return {
+        ...item,
+        unitPrice: String(unitPrice),
+        // 参与折扣时带原价（前端划线展示）
+        originalPrice: discount ? String(base) : null,
+        discountRate: discount ? discount.rate : null,
+      };
+    });
 
     // 合计：数量与金额（Decimal -> number 求和）
     const totalQuantity = itemsWithPrice.reduce((sum, item) => sum + item.quantity, 0);
