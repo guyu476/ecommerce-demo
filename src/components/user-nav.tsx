@@ -66,7 +66,11 @@ export function UserNav() {
       <Link href="/cart" className="hover:opacity-70">
         🛒 购物车
         {cartCount > 0 && (
-          <span className="ml-1 rounded-full bg-promo px-1.5 py-0.5 text-xs text-white">
+          // key 绑数量：数量一变就重挂载，重播一次跳动动画
+          <span
+            key={cartCount}
+            className="badge-bump ml-1 inline-block rounded-full bg-promo px-1.5 py-0.5 text-xs text-white"
+          >
             {cartCount}
           </span>
         )}

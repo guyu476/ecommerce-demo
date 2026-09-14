@@ -26,17 +26,19 @@ export function ProductCard({
 
   return (
     <div
-      className="hover-lift group block overflow-visible rounded-xl border border-black/10 bg-white transition-all hover:z-10 hover:-translate-y-1 hover:rotate-0 hover:shadow-xl dark:border-white/15 dark:bg-white/5"
+      className="hover-lift group block overflow-visible rounded-xl border border-black/[0.07] bg-white shadow-[0_1px_2px_rgba(20,33,61,0.04),0_10px_28px_-18px_rgba(20,33,61,0.35)] hover:z-10 hover:-translate-y-1 hover:rotate-0 hover:border-black/10 hover:shadow-[0_2px_6px_rgba(20,33,61,0.06),0_24px_46px_-20px_rgba(20,33,61,0.45)] dark:border-white/15 dark:bg-white/5"
       style={{ rotate: `${tilt}deg` }}
     >
       <Link href={`/products/${product.id}`} className="block">
         <div className="relative">
-          <div className="aspect-square overflow-hidden rounded-t-xl bg-zinc-800">
+          <div className="shine relative aspect-square overflow-hidden rounded-t-xl bg-mist dark:bg-white/10">
             {cover ? (
               /* eslint-disable-next-line @next/next/no-img-element */
               <img
                 src={cover}
                 alt={product.name}
+                loading="lazy"
+                decoding="async"
                 className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
               />
             ) : null}
@@ -53,7 +55,7 @@ export function ProductCard({
           </div>
 
           {discountRate != null && (
-            <span className="absolute top-0 left-0 rounded-tr-xl bg-promo px-2 py-1 text-[11px] font-bold text-white">
+            <span className="badge-pulse absolute top-0 left-0 rounded-tr-xl bg-promo px-2 py-1 text-[11px] font-bold text-white">
               限时 {rateLabel(discountRate)}
             </span>
           )}

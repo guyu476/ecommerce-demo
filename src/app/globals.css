@@ -1,9 +1,10 @@
 @import "tailwindcss";
 
 /* 设计 token：「市集画报」方向
-   墨蓝 #14213D 结构色 · 促销红 #E63946 价格/CTA · 市集黄 #FCA311 强调 */
+   墨蓝 #14213D 结构色 · 促销红 #E63946 价格/CTA · 市集黄 #FCA311 强调
+   底色不用纯白，改用微冷的纸色，让白卡片浮起来，页面才有层次 */
 :root {
-  --background: #ffffff;
+  --background: #f7f8fb;
   --foreground: #14213d;
 }
 
@@ -31,10 +32,14 @@
   }
 }
 
+/* 中文优先字体栈：拉丁字形走 Geist，中文回落到平台最优黑体。
+   不引入中文字体包（动辄数 MB），靠字重与字距做出画报的排印感 */
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  font-family:
+    var(--font-geist-sans), "PingFang SC", "HarmonyOS Sans SC", "Hiragino Sans GB",
+    "Microsoft YaHei", "Source Han Sans SC", "Noto Sans SC", system-ui, Arial, sans-serif;
 }
 
 /* 全局质感细节：文本选中色 / 细滚动条 / 键盘焦点环 / 平滑滚动 */
@@ -78,16 +83,23 @@ html {
   background-color: rgba(20, 33, 61, 0.4);
 }
 
-/* 点阵纸纹（浅色模式），给白底一点纸的质感 */
-@media (prefers-color-scheme: light) {
+/* 纸张纤维质感：极细的交叉网格。原来那层点阵在纸色底上会和纹理叠成脏点，换成纤维更干净 */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    repeating-linear-gradient(0deg, rgba(20, 33, 61, 0.014) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(90deg, rgba(20, 33, 61, 0.014) 0 1px, transparent 1px 3px);
+}
+
+@media (prefers-color-scheme: dark) {
   body::before {
-    content: "";
-    position: fixed;
-    inset: 0;
-    z-index: -1;
-    pointer-events: none;
-    background-image: radial-gradient(rgba(20, 33, 61, 0.05) 1px, transparent 1px);
-    background-size: 26px 26px;
+    background-image:
+      repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.022) 0 1px, transparent 1px 3px),
+      repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.022) 0 1px, transparent 1px 3px);
   }
 }
 
@@ -122,15 +134,17 @@ html {
   animation: marquee 22s linear infinite;
 }
 
-/* 巨型描边水印字（板块背景装饰） */
+/* 巨型水印字（板块背景装饰）：实心浅色 + 细描边。
+   纯描边（transparent + 0.08 alpha）几乎看不见，等于白做 */
 .text-outline {
-  color: transparent;
-  -webkit-text-stroke: 1.5px rgba(20, 33, 61, 0.08);
+  color: rgba(20, 33, 61, 0.055);
+  -webkit-text-stroke: 1px rgba(20, 33, 61, 0.09);
 }
 
 @media (prefers-color-scheme: dark) {
   .text-outline {
-    -webkit-text-stroke-color: rgba(237, 237, 242, 0.07);
+    color: rgba(237, 237, 242, 0.05);
+    -webkit-text-stroke-color: rgba(237, 237, 242, 0.09);
   }
 }
 
@@ -210,6 +224,121 @@ html {
   }
 }
 
+/* ---------- 滚动入场动效 ----------
+   Reveal 组件进入视口后给容器加 .is-in 触发；
+   网格用 .stagger，子项靠内联 --i 做错位延迟，形成「一列列铺开」的观感 */
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(22px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* .reveal / .stagger 只在 Reveal 组件判定「元素在首屏之外」后才挂上，
+   无 JS 或首屏内容不会带上这些类，因此内容永远不会被动画锁死 */
+.reveal {
+  opacity: 0;
+}
+
+/* 必须显式复位：stagger 分支靠子项各自播动画，容器自己不播 fade-in，
+   如果只靠动画的 fill 收尾，容器会一直停在 opacity:0 上，整块内容不可见 */
+.reveal.is-in {
+  opacity: 1;
+}
+
+.reveal.is-in:not(.stagger) {
+  animation: fade-in 0.5s ease-out both;
+}
+
+.reveal.stagger > * {
+  opacity: 0;
+}
+
+.reveal.stagger.is-in > * {
+  animation: rise-in 0.55s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+  animation-delay: calc(var(--i, 0) * 55ms);
+}
+
+/* 卡片抬升：补一条更细腻的过渡曲线（原来只有 transition-all） */
+.hover-lift {
+  transition:
+    transform 0.35s cubic-bezier(0.22, 0.61, 0.36, 1),
+    box-shadow 0.35s ease,
+    border-color 0.35s ease;
+}
+
+/* 按压反馈：按下时轻微内缩。
+   刻意不在这里写 transition —— 无图层样式会盖掉 Tailwind 的 transition-* 工具类，
+   过渡交给元素自身的 transition-all / transition-colors 处理 */
+.press:active {
+  transform: scale(0.96);
+}
+
+/* 折扣角标呼吸光晕 */
+@keyframes promo-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(230, 57, 70, 0.55);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(230, 57, 70, 0);
+  }
+}
+
+.badge-pulse {
+  animation: promo-pulse 2s ease-out infinite;
+}
+
+/* 购物车角标：数量变化时跳一下 */
+@keyframes badge-bump {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.45);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.badge-bump {
+  animation: badge-bump 0.45s ease-out;
+}
+
+/* 图片悬停扫光：市集灯箱扫过去的一道高光 */
+.shine::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    105deg,
+    transparent 35%,
+    rgba(255, 255, 255, 0.45) 50%,
+    transparent 65%
+  );
+  transform: translateX(-120%);
+  transition: transform 0.75s ease;
+}
+
+.group:hover .shine::after {
+  transform: translateX(120%);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .hover-lift {
     transition: none !important;
@@ -221,5 +350,17 @@ html {
   .toast-in,
   .skeleton {
     animation: none !important;
+  }
+  .reveal,
+  .reveal.stagger > * {
+    opacity: 1 !important;
+    animation: none !important;
+  }
+  .badge-pulse,
+  .badge-bump {
+    animation: none !important;
+  }
+  .shine::after {
+    display: none;
   }
 }

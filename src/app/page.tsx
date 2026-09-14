@@ -2,6 +2,7 @@ import Link from "next/link";
 import { DbSetupNotice } from "@/components/db-setup-notice";
 import { HeroCarousel } from "@/components/hero-carousel";
 import { ProductCard } from "@/components/product-card";
+import { Reveal } from "@/components/reveal";
 import { getActiveDiscounts } from "@/lib/discounts";
 import { getHomepageCoupons, getStorefrontData, parseProductImages } from "@/lib/queries";
 import type { StorefrontSort } from "@/lib/queries";
@@ -10,7 +11,9 @@ import type { StorefrontSort } from "@/lib/queries";
 // 商品数据需要每次请求时拉取最新，强制动态渲染
 export const dynamic = "force-dynamic";
 
-// 板块标题（画报风）：巨型描边水印字垫底 + 印章 + 实标题
+// 板块标题（画报风）：巨型水印字垫在标题上方 + 印章 + 实标题
+// 水印必须抬到标题行之上并向右错开：原来落在 left-0 与印章同坐标，看起来像把标题又写了一遍；
+// 标题行在移动端纵向堆叠，避免被右侧操作区挤到折行
 function SectionTitle({
   children,
   watermark,
@@ -21,16 +24,16 @@ function SectionTitle({
   extra?: React.ReactNode;
 }) {
   return (
-    <div className="relative mb-10 flex items-end justify-between">
+    <div className="relative mb-10 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
       <span
         aria-hidden
-        className="text-outline pointer-events-none absolute -top-9 left-0 -rotate-2 text-7xl font-black tracking-tight select-none"
+        className="text-outline pointer-events-none absolute -top-14 left-5 hidden text-7xl font-black tracking-tight select-none sm:block"
       >
         {watermark}
       </span>
       <h2 className="relative flex items-center gap-3">
-        <span className="seal h-9 w-9 rounded-lg text-xl">{watermark.slice(0, 1)}</span>
-        <span className="text-2xl font-extrabold tracking-tight">{children}</span>
+        <span className="seal h-9 w-9 shrink-0 rounded-lg text-xl">{watermark.slice(0, 1)}</span>
+        <span className="text-2xl font-extrabold tracking-tight whitespace-nowrap">{children}</span>
       </h2>
       {extra}
     </div>
@@ -61,11 +64,11 @@ function CategoryTicket({
       {/* 两侧打孔 */}
       <span
         aria-hidden
-        className={`absolute -left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 rounded-full bg-white dark:bg-[#0b1220]`}
+        className="absolute -left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 rounded-full bg-background"
       />
       <span
         aria-hidden
-        className={`absolute -right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 rounded-full bg-white dark:bg-[#0b1220]`}
+        className={`absolute -right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 rounded-full bg-background`}
       />
     </Link>
   );
@@ -125,8 +128,8 @@ export default async function Home({ searchParams }: PageProps<"/">) {
 
   return (
     <main className="mx-auto w-full max-w-6xl flex-1 space-y-20 px-8 py-12">
-      {/* 固定搜索栏：滚动时吸顶，随时可搜 */}
-      <div className="sticky top-0 z-20 -mx-8 -mt-12 mb-[-40px] border-b border-black/5 bg-paper/90 px-8 py-4 backdrop-blur dark:border-white/10 dark:bg-[#0b1220]/90">
+      {/* 固定搜索栏：吸附在吸顶头部下方（top-16 = header 高度），随时可搜 */}
+      <div className="sticky top-16 z-20 -mx-8 -mt-12 mb-[-40px] border-b border-black/5 bg-background/85 px-8 py-4 backdrop-blur dark:border-white/10">
         <form action="/" method="get" className="mx-auto flex max-w-2xl gap-2">
           {categorySlug && <input type="hidden" name="category" value={categorySlug} />}
           {sort !== "default" && <input type="hidden" name="sort" value={sort} />}
@@ -135,11 +138,11 @@ export default async function Home({ searchParams }: PageProps<"/">) {
             name="keyword"
             defaultValue={keyword ?? ""}
             placeholder="搜索商品名称 / 描述，如：手机 / 苹果 / 键盘…"
-            className="flex-1 rounded-full border border-black/15 px-5 py-2.5 text-sm outline-none focus:border-promo dark:border-white/20"
+            className="flex-1 rounded-full border border-black/15 px-5 py-2.5 text-sm outline-none transition-colors focus:border-promo dark:border-white/20"
           />
           <button
             type="submit"
-            className="rounded-full bg-ink px-7 text-sm font-medium text-white transition-colors hover:bg-ink-soft"
+            className="press rounded-full bg-ink px-7 text-sm font-medium text-white transition-colors hover:bg-ink-soft"
           >
             搜索
           </button>
@@ -169,12 +172,12 @@ export default async function Home({ searchParams }: PageProps<"/">) {
 
       {/* 领券条幅：满减票根，点击进领券中心 */}
       {coupons.length > 0 && (
-        <section className="-rotate-1">
+        <Reveal as="section" className="-rotate-1">
           <ul className="flex flex-wrap gap-4">
             {coupons.map((coupon) => (
               <li key={coupon.id}>
                 <Link
-                  href="/user#coupons"
+                  href="/user?tab=coupons"
                   className="relative flex items-stretch overflow-hidden rounded-lg border-2 border-dashed border-promo/50 bg-white shadow-md transition-all hover:-translate-y-0.5 hover:shadow-lg dark:bg-white/5"
                 >
                   <span className="flex items-center gap-1 bg-promo/10 px-4 py-3 font-mono text-lg font-black text-promo">
@@ -191,11 +194,11 @@ export default async function Home({ searchParams }: PageProps<"/">) {
               </li>
             ))}
           </ul>
-        </section>
+        </Reveal>
       )}
 
       {categories.length > 0 && (
-        <section>
+        <Reveal as="section">
           <SectionTitle watermark="分类">商品分类</SectionTitle>
           <ul className="flex flex-wrap gap-x-6 gap-y-5 px-2">
             <li>
@@ -219,7 +222,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
               </li>
             ))}
           </ul>
-        </section>
+        </Reveal>
       )}
 
       <section>
@@ -237,7 +240,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
                         page: undefined,
                       })}
                       scroll={false}
-                      className={`inline-block rounded-full px-3.5 py-1.5 transition-colors ${
+                      className={`press inline-block rounded-full px-3.5 py-1.5 transition-colors ${
                         sort === option.value
                           ? "bg-promo text-white"
                           : "bg-mist text-ink hover:bg-black/10 dark:bg-white/10 dark:text-white dark:hover:bg-white/20"
@@ -270,9 +273,13 @@ export default async function Home({ searchParams }: PageProps<"/">) {
           </div>
         ) : (
           <>
-            <ul className="grid grid-cols-2 gap-x-8 gap-y-12 sm:grid-cols-3 lg:grid-cols-4">
+            <Reveal
+              as="ul"
+              stagger
+              className="grid grid-cols-2 gap-x-8 gap-y-12 sm:grid-cols-3 lg:grid-cols-4"
+            >
               {products.map((product, i) => (
-                <li key={product.id} className="pt-1">
+                <li key={product.id} className="pt-1" style={{ "--i": i } as React.CSSProperties}>
                   <ProductCard
                     product={product}
                     rank={page === 1 && sort === "default" ? i + 1 : undefined}
@@ -281,7 +288,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
                   />
                 </li>
               ))}
-            </ul>
+            </Reveal>
 
             {/* 分页：上一页 / 页码 / 下一页 */}
             {totalPages > 1 && (
@@ -289,7 +296,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
                 {page > 1 ? (
                   <Link
                     href={withParams({ page: String(page - 1) })}
-                    className="rounded-full border border-black/15 px-4 py-2 transition-colors hover:border-promo hover:text-promo dark:border-white/20"
+                    className="press rounded-full border border-black/15 px-4 py-2 transition-colors hover:border-promo hover:text-promo dark:border-white/20"
                   >
                     ← 上一页
                   </Link>
@@ -309,7 +316,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
                       key={n}
                       href={withParams({ page: String(n) })}
                       aria-current={n === page ? "page" : undefined}
-                      className={`h-9 w-9 rounded-full text-center leading-9 transition-colors ${
+                      className={`press h-9 w-9 rounded-full text-center leading-9 transition-colors ${
                         n === page
                           ? "bg-ink font-semibold text-white"
                           : "bg-mist hover:bg-black/10 dark:bg-white/10 dark:hover:bg-white/20"
@@ -322,7 +329,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
                 {page < totalPages ? (
                   <Link
                     href={withParams({ page: String(page + 1) })}
-                    className="rounded-full border border-black/15 px-4 py-2 transition-colors hover:border-promo hover:text-promo dark:border-white/20"
+                    className="press rounded-full border border-black/15 px-4 py-2 transition-colors hover:border-promo hover:text-promo dark:border-white/20"
                   >
                     下一页 →
                   </Link>

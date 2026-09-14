@@ -82,10 +82,15 @@ export function HeroCarousel({ slides }: { slides: CarouselSlide[] }) {
                   立即查看
                 </Link>
               </div>
-              <div className="h-40 w-40 shrink-0 overflow-hidden rounded-xl bg-zinc-800 sm:h-48 sm:w-48">
+              <div className="h-40 w-40 shrink-0 overflow-hidden rounded-xl bg-white/10 sm:h-48 sm:w-48">
                 {slide.image ? (
                   /* eslint-disable-next-line @next/next/no-img-element */
-                  <img src={slide.image} alt={slide.name} className="h-full w-full object-cover" />
+                  <img
+                    src={slide.image}
+                    alt={slide.name}
+                    decoding="async"
+                    className="h-full w-full object-cover"
+                  />
                 ) : null}
               </div>
             </article>

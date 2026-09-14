@@ -21,12 +21,13 @@ const AVATAR_OPTIONS = ["🙂", "😎", "🥰", "🤠", "🐱", "🐼", "🦊", 
 type UserTab = "profile" | "address" | "coupons" | "favorites" | "orders";
 
 // 初始 Tab：支持 /user?tab=xxx 直达；/user#coupons 旧锚点链接自动落到优惠券 Tab
+// 无参数时落在「个人资料」，否则用户永远进不去该 Tab
 function initialUserTab(): UserTab {
-  if (typeof window === "undefined") return "coupons";
+  if (typeof window === "undefined") return "profile";
   const tabParam = new URLSearchParams(window.location.search).get("tab");
   const valid: UserTab[] = ["profile", "address", "coupons", "favorites", "orders"];
   if (tabParam && valid.includes(tabParam as UserTab)) return tabParam as UserTab;
-  return window.location.hash === "#coupons" ? "coupons" : "coupons";
+  return window.location.hash === "#coupons" ? "coupons" : "profile";
 }
 
 // 头像统一渲染：data URL 用 <img>，emoji 用文字

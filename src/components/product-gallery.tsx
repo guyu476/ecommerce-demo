@@ -32,7 +32,7 @@ export function ProductGallery({ images }: { images: string[] }) {
   }, [images]);
 
   if (images.length === 0) {
-    return <div className="aspect-square rounded-md bg-zinc-800" />;
+    return <div className="aspect-square rounded-md bg-mist dark:bg-white/10" />;
   }
 
   const current = override ?? images[active];
@@ -51,12 +51,13 @@ export function ProductGallery({ images }: { images: string[] }) {
 
   return (
     <div className="space-y-3">
-      <div className="relative aspect-square overflow-hidden rounded-md bg-zinc-800">
+      <div className="relative aspect-square overflow-hidden rounded-md bg-mist dark:bg-white/10">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={current}
           alt={`商品图 ${active + 1}`}
           onClick={() => setZoomed(true)}
+          decoding="async"
           className="h-full w-full cursor-zoom-in object-cover"
         />
         {images.length > 1 && (
@@ -97,7 +98,13 @@ export function ProductGallery({ images }: { images: string[] }) {
               }`}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={image} alt={`缩略图 ${i + 1}`} className="h-full w-full object-cover" />
+              <img
+                src={image}
+                alt={`缩略图 ${i + 1}`}
+                loading="lazy"
+                decoding="async"
+                className="h-full w-full object-cover"
+              />
             </button>
           ))}
         </div>

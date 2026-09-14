@@ -63,8 +63,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             </div>
           </div>
 
-          {/* 非悬浮头部：滚动时不遮挡页面内容 */}
-          <header className="bg-ink text-white">
+          {/* 吸顶头部：滚动时常驻，和首页吸顶搜索栏叠成「品牌 + 搜索」两级导航 */}
+          <header className="sticky top-0 z-30 bg-ink text-white shadow-lg shadow-ink/10">
             <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-4 sm:px-6">
               <Link href="/" className="flex items-center gap-3">
                 <BirdMark />

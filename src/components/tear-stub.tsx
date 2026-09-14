@@ -67,9 +67,23 @@ function shake(el: HTMLElement | null) {
   );
 }
 
+// 固定种子的伪随机（mulberry32）。
+// 撕口锯齿必须在服务端与客户端算出完全一样的结果，否则 clip-path 内联样式两边不一致，
+// React 会报 hydration 不一致并丢掉这一子树的复用。原来这里直接用 Math.random() 就是这个毛病。
+function seededRandom(seed: number): () => number {
+  let t = seed;
+  return () => {
+    t += 0x6d2b79f5;
+    let r = Math.imul(t ^ (t >>> 15), 1 | t);
+    r ^= r + Math.imul(r ^ (r >>> 7), 61 | r);
+    return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
 function makeTearClips(): { leftClip: (p: number) => string; rightClip: (p: number) => string } {
+  const rand = seededRandom(0x5eed);
   const leftJitter = Array.from({ length: CLIP_STEPS + 1 }, (_, i) =>
-    i === 0 || i === CLIP_STEPS ? 0 : (i % 2 === 0 ? -1 : 1) * (0.8 + Math.random() * 1.6),
+    i === 0 || i === CLIP_STEPS ? 0 : (i % 2 === 0 ? -1 : 1) * (0.8 + rand() * 1.6),
   );
   const rightJitter = leftJitter.map((v, i) => (i === 0 || i === CLIP_STEPS ? 0 : -v));
   const leftClip = (p: number) => {
@@ -88,6 +102,9 @@ function makeTearClips(): { leftClip: (p: number) => string; rightClip: (p: numb
   };
   return { leftClip, rightClip };
 }
+
+// 模块级常量：每个进程只算一次，服务端/客户端各算一次但结果相同
+const TEAR_CLIPS = makeTearClips();
 
 export function TearStub({
   productId,
@@ -109,7 +126,6 @@ export function TearStub({
   const startX = useRef<number | null>(null);
   const lastX = useRef<number | null>(null);
   const busy = useRef(false);
-  const clips = useRef(makeTearClips());
   // 物理状态：p 撕口进度（弹簧式追赶 pTarget）；theta/omega 悬垂摆；snapped 后自由落体
   const phys = useRef({
     p: 0,
@@ -328,11 +344,11 @@ export function TearStub({
     <>
       <span
         aria-hidden
-        className="absolute -left-2 -top-2 h-4 w-4 rounded-full bg-white dark:bg-[#0b1220]"
+        className="absolute -left-2 -top-2 h-4 w-4 rounded-full bg-white dark:bg-background"
       />
       <span
         aria-hidden
-        className="absolute -right-2 -top-2 h-4 w-4 rounded-full bg-white dark:bg-[#0b1220]"
+        className="absolute -right-2 -top-2 h-4 w-4 rounded-full bg-white dark:bg-background"
       />
       <span
         aria-hidden
@@ -408,7 +424,7 @@ export function TearStub({
           style={
             progress === 0 && !dragging
               ? undefined
-              : { clipPath: clips.current.rightClip(progress), transformOrigin: "100% 100%" }
+              : { clipPath: TEAR_CLIPS.rightClip(progress), transformOrigin: "100% 100%" }
           }
         >
           {stubContent}
@@ -419,7 +435,7 @@ export function TearStub({
           className={stubBase}
           style={{
             opacity: progress === 0 && !dragging && !snapped ? 0 : 1,
-            clipPath: clips.current.leftClip(progress),
+            clipPath: TEAR_CLIPS.leftClip(progress),
             transformOrigin: "100% 50%",
             transform: snapped
               ? `translate(${s.x.toFixed(1)}px, ${s.y.toFixed(1)}px) rotate(${s.rot.toFixed(1)}deg)`
