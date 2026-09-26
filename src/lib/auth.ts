@@ -62,7 +62,9 @@ export function setSessionCookie(response: Response, token: string): void {
   response.headers.append(
     "Set-Cookie",
     `${SESSION_COOKIE}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${SESSION_MAX_AGE}${
-      process.env.NODE_ENV === "production" ? "; Secure" : ""
+      process.env.NODE_ENV === "production" && process.env.COOKIE_SECURE !== "false"
+        ? "; Secure"
+        : ""
     }`,
   );
 }
