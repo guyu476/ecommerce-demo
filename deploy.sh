@@ -9,6 +9,16 @@ if ! command -v docker >/dev/null 2>&1; then
   exit 1
 fi
 
+# 兼容 docker compose（v2 插件）和 docker-compose（v1）
+if docker compose version >/dev/null 2>&1; then
+  DC="docker compose"
+elif command -v docker-compose >/dev/null 2>&1; then
+  DC="docker-compose"
+else
+  echo "✘ 找不到 docker compose。请执行： bash setup-server.sh"
+  exit 1
+fi
+
 if [ ! -f .env ]; then
   echo "✘ 找不到 .env"
   echo "  请先执行： cp deploy.env.example .env"
@@ -20,15 +30,15 @@ echo "▶ 1/3 拉取最新代码..."
 git pull --ff-only
 
 echo "▶ 2/3 构建并启动（首次约 5-10 分钟，请耐心等待）..."
-docker compose up -d --build
+$DC up -d --build
 
 echo "▶ 3/3 当前状态："
-docker compose ps
+$DC ps
 
 IP=$(curl -s --max-time 5 ifconfig.me 2>/dev/null || echo "<你的公网IP>")
 echo ""
 echo "=========================================="
 echo "  访问地址： http://${IP}:3000"
-echo "  查看日志： docker compose logs -f app"
-echo "  停止服务： docker compose down"
+echo "  查看日志： $DC logs -f app"
+echo "  停止服务： $DC down"
 echo "=========================================="
