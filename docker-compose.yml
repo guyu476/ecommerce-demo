@@ -1,0 +1,52 @@
+# 电商演示站 · 单机部署编排
+#
+# 用法（服务器上，项目根目录）：
+#   cp deploy.env.example .env     # 然后填好密码和密钥
+#   docker compose up -d --build
+#
+# 数据库跑在同一台机器的容器里，不需要额外买云数据库。
+
+services:
+  db:
+    image: mysql:8.0
+    restart: unless-stopped
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?请在 .env 里设置 MYSQL_ROOT_PASSWORD}
+      MYSQL_ROOT_HOST: "%"
+      MYSQL_DATABASE: ecommerce_demo
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 40s
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: mysql://root:${MYSQL_ROOT_PASSWORD}@db:3306/ecommerce_demo
+      JWT_SECRET: ${JWT_SECRET:?请在 .env 里设置 JWT_SECRET}
+      PAY_TIMEOUT_MINUTES: ${PAY_TIMEOUT_MINUTES:-15}
+      # 用 http://IP:3000 访问时必须是 false，否则浏览器会丢弃 Secure Cookie 导致登录失效
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+    ports:
+      - "3000:3000"
+    volumes:
+      # 商品图片存宿主机卷，重新部署不丢
+      - uploads:/app/public/uploads
+    # 等数据库健康 -> 建表 -> 导演示数据 -> 启动
+    command: sh -c "npx prisma migrate deploy && npm run db:seed && npm run start"
+
+volumes:
+  mysql_data:
+  uploads:

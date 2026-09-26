@@ -1,0 +1,31 @@
+# 依赖与构建产物（容器内会重新生成）
+node_modules
+.next
+*.tsbuildinfo
+
+# 版本控制与本地配置（.env 绝不打进镜像）
+.git
+.gitignore
+.env
+.env.*
+deploy.env.example
+
+# 本地开发 / 临时目录
+.idea
+.vscode
+.workbuddy
+.captures
+.upload-manifest.json
+
+# 部署时用不到的内容
+docs
+tests
+scripts
+README.md
+Dockerfile
+docker-compose.yml
+deploy.sh
+setup-server.sh
+
+# 运行时用户上传的图片（用数据卷挂载，不打包）
+public/uploads
