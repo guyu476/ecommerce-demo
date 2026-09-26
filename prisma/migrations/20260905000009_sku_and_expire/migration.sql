@@ -35,8 +35,5 @@ CREATE TABLE `product_skus` (
 CREATE UNIQUE INDEX `cart_items_user_id_product_id_sku_id_key` ON `cart_items`(`user_id`, `product_id`, `sku_id`);
 
 -- AddForeignKey
-ALTER TABLE `cart_items` ADD CONSTRAINT `cart_items_product_id_fkey` FOREIGN KEY (`product_id`) REFERENCES `products`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE `product_skus` ADD CONSTRAINT `product_skus_product_id_fkey` FOREIGN KEY (`product_id`) REFERENCES `products`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
