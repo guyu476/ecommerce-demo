@@ -22,6 +22,7 @@ type SeedProduct = {
   stock: number;
   sales: number;
   categorySlug: string;
+  image: string;
 };
 
 const products: SeedProduct[] = [
@@ -32,6 +33,7 @@ const products: SeedProduct[] = [
     stock: 120,
     sales: 856,
     categorySlug: "digital",
+    image: "/products/p1.jpg",
   },
   {
     name: "降噪无线蓝牙耳机 AirPro 3",
@@ -40,6 +42,7 @@ const products: SeedProduct[] = [
     stock: 300,
     sales: 2143,
     categorySlug: "digital",
+    image: "/products/p2.jpg",
   },
   {
     name: "智能手表 Watch S2 运动版",
@@ -48,6 +51,7 @@ const products: SeedProduct[] = [
     stock: 85,
     sales: 432,
     categorySlug: "digital",
+    image: "/products/p3.jpg",
   },
   {
     name: "轻薄笔记本电脑 MateBook 14 英寸",
@@ -56,6 +60,7 @@ const products: SeedProduct[] = [
     stock: 45,
     sales: 189,
     categorySlug: "computer",
+    image: "/products/p4.jpg",
   },
   {
     name: "机械键盘 87 键 红轴",
@@ -64,6 +69,7 @@ const products: SeedProduct[] = [
     stock: 210,
     sales: 1240,
     categorySlug: "computer",
+    image: "/products/p5.jpg",
   },
   {
     name: "4K 显示器 27 英寸 IPS",
@@ -72,6 +78,7 @@ const products: SeedProduct[] = [
     stock: 60,
     sales: 267,
     categorySlug: "computer",
+    image: "/products/p6.jpg",
   },
   {
     name: "变频空调 大1.5匹 新一级能效",
@@ -80,6 +87,7 @@ const products: SeedProduct[] = [
     stock: 35,
     sales: 98,
     categorySlug: "appliance",
+    image: "/products/p7.jpg",
   },
   {
     name: "扫地机器人 扫拖一体",
@@ -88,6 +96,7 @@ const products: SeedProduct[] = [
     stock: 50,
     sales: 356,
     categorySlug: "appliance",
+    image: "/products/p8.jpg",
   },
   {
     name: "纯棉基础款圆领 T 恤",
@@ -96,6 +105,7 @@ const products: SeedProduct[] = [
     stock: 500,
     sales: 5320,
     categorySlug: "fashion",
+    image: "/products/p9.jpg",
   },
   {
     name: "轻商务休闲双肩包",
@@ -104,6 +114,7 @@ const products: SeedProduct[] = [
     stock: 260,
     sales: 876,
     categorySlug: "fashion",
+    image: "/products/p10.jpg",
   },
   {
     name: "氨基酸保湿洁面乳 150ml",
@@ -112,6 +123,7 @@ const products: SeedProduct[] = [
     stock: 400,
     sales: 2980,
     categorySlug: "beauty",
+    image: "/products/p11.jpg",
   },
   {
     name: "阿克苏冰糖心苹果 5kg 装",
@@ -120,6 +132,7 @@ const products: SeedProduct[] = [
     stock: 150,
     sales: 4110,
     categorySlug: "food",
+    image: "/products/p12.jpg",
   },
 ];
 
@@ -262,6 +275,7 @@ async function main() {
         sellerId,
         shopId,
         seedKey,
+        images: JSON.stringify([product.image]),
       },
     });
     productIdByIndex.set(index, newRecord.id);
@@ -404,12 +418,17 @@ async function main() {
   const discountStart = new Date(Date.now() - 3600_000);
   const discountEnd = new Date(Date.now() + 3 * 86400_000);
   const discountExists = await prisma.discountActivity.findFirst({
-    where: { title: '开学季限时 8.5 折' },
+    where: { title: "开学季限时 8.5 折" },
   });
-  if (!discountExists && productIdByIndex.get(0) && productIdByIndex.get(1) && productIdByIndex.get(4)) {
+  if (
+    !discountExists &&
+    productIdByIndex.get(0) &&
+    productIdByIndex.get(1) &&
+    productIdByIndex.get(4)
+  ) {
     await prisma.discountActivity.create({
       data: {
-        title: '开学季限时 8.5 折',
+        title: "开学季限时 8.5 折",
         rate: 0.85,
         startAt: discountStart,
         endAt: discountEnd,
@@ -443,10 +462,38 @@ async function main() {
         { name: "版本", values: ["8+128GB", "12+256GB"] },
       ];
       const flagshipSkus = [
-        { specs: [{ name: "颜色", value: "曜石黑" }, { name: "版本", value: "8+128GB" }], price: 3499, stock: 40 },
-        { specs: [{ name: "颜色", value: "冰川白" }, { name: "版本", value: "8+128GB" }], price: 3499, stock: 35 },
-        { specs: [{ name: "颜色", value: "曜石黑" }, { name: "版本", value: "12+256GB" }], price: 3799, stock: 25 },
-        { specs: [{ name: "颜色", value: "冰川白" }, { name: "版本", value: "12+256GB" }], price: 3799, stock: 20 },
+        {
+          specs: [
+            { name: "颜色", value: "曜石黑" },
+            { name: "版本", value: "8+128GB" },
+          ],
+          price: 3499,
+          stock: 40,
+        },
+        {
+          specs: [
+            { name: "颜色", value: "冰川白" },
+            { name: "版本", value: "8+128GB" },
+          ],
+          price: 3499,
+          stock: 35,
+        },
+        {
+          specs: [
+            { name: "颜色", value: "曜石黑" },
+            { name: "版本", value: "12+256GB" },
+          ],
+          price: 3799,
+          stock: 25,
+        },
+        {
+          specs: [
+            { name: "颜色", value: "冰川白" },
+            { name: "版本", value: "12+256GB" },
+          ],
+          price: 3799,
+          stock: 20,
+        },
       ];
       await prisma.sku.createMany({
         data: flagshipSkus.map((sku) => ({
