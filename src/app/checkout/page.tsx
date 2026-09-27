@@ -47,9 +47,27 @@ export default function CheckoutPage() {
   // 幂等键：从「结算这一意图」派生——首次提交时生成一次，失败重试复用同一 key
   const idempotencyKeyRef = useRef<string | null>(null);
 
+  // 生成 32 位随机 hex。crypto.randomUUID 只在安全上下文（HTTPS / localhost）可用，
+  // 以明文 HTTP 访问公网 IP 时它是 undefined，直接调用会让提交抛错（表现为「网络异常」）。
+  // crypto.getRandomValues 在非安全上下文同样可用，作为首选降级方案。
+  function randomIdempotencyKey(): string {
+    const bytes = new Uint8Array(16);
+    if (typeof crypto !== "undefined" && typeof crypto.getRandomValues === "function") {
+      crypto.getRandomValues(bytes);
+    } else {
+      for (let i = 0; i < bytes.length; i += 1) {
+        bytes[i] = Math.floor(Math.random() * 256);
+      }
+    }
+    return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+  }
+
   function getIdempotencyKey(): string {
     if (!idempotencyKeyRef.current) {
-      idempotencyKeyRef.current = crypto.randomUUID();
+      idempotencyKeyRef.current =
+        typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+          ? crypto.randomUUID()
+          : randomIdempotencyKey();
     }
     return idempotencyKeyRef.current;
   }
@@ -146,7 +164,8 @@ export default function CheckoutPage() {
         const key = item.product.sellerId ?? 0;
         shopSubtotals.set(
           key,
-          (shopSubtotals.get(key) ?? 0) + Number(item.unitPrice ?? item.product.price) * item.quantity,
+          (shopSubtotals.get(key) ?? 0) +
+            Number(item.unitPrice ?? item.product.price) * item.quantity,
         );
       }
 
@@ -269,7 +288,7 @@ export default function CheckoutPage() {
                   className="h-full w-full object-cover"
                 />
               ) : (
-                item.product.category?.icon ?? "🛍️"
+                (item.product.category?.icon ?? "🛍️")
               )}
             </div>
             <p className="min-w-0 flex-1 truncate text-sm">
